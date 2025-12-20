@@ -61,6 +61,7 @@ header h1 {
     border-radius: 1rem;
     line-height: 1.5;
     word-wrap: break-word;
+    white-space: pre-wrap;
 }
 
 .message.user {
