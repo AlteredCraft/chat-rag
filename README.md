@@ -8,6 +8,7 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 
 *   **Real-time Streaming**: Implements Server-Sent Events (SSE) logic to stream LLM responses token-by-token.
 *   **Modular Architecture**: Organized following Flask best practices (Blueprints, Application Factory pattern).
+*   **Centralized Logging**: Configurable logging for the app (DEBUG) and dependencies (INFO) with support for stdout and file output.
 *   **OpenRouter Integration**: Easy access to various state-of-the-art models via a single API.
 *   **Clean UI**: A responsive, modern chat interface built with raw HTML/CSS/JS (no heavy frontend frameworks).
 *   **Modern Python Tooling**: Uses `uv` for blazing fast dependency management.
