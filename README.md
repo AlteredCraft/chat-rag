@@ -33,9 +33,16 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
     ```bash
     cp .env.example .env  # If example exists, otherwise create manually
     ```
-    Add your API key to `.env`:
+    Add your API key and optional configuration to `.env`:
     ```env
     OPENROUTER_API_KEY=sk-or-v1-your-key-here
+    
+    # Optional Logging Configuration
+    LOG_LEVEL_APP=DEBUG
+    LOG_LEVEL_DEPS=INFO
+    LOG_TO_STDOUT=true
+    LOG_TO_FILE=true
+    LOG_FILE_PATH=app.log
     ```
 
 3.  **Run the application**
@@ -52,16 +59,23 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 ```text
 chat-rag-explorer/
 ├── chat_rag_explorer/   # Main package
-│   ├── static/          # CSS and JavaScript
+│   ├── static/          # CSS, JS, and local libraries (Marked.js, DOMPurify)
 │   ├── templates/       # HTML templates
 │   ├── __init__.py      # App factory
+│   ├── logging.py       # Centralized logging configuration
 │   ├── routes.py        # Web endpoints
 │   └── services.py      # LLM integration logic
-├── config.py            # Configuration settings
+├── docs/
+│   └── adr/             # Architecture Decision Records (ADRs)
+├── config.py            # Configuration settings (environment variable mapping)
 ├── main.py              # Application entry point
-├── pyproject.toml       # Dependencies (uv)
-└── .env                 # Secrets (gitignored)
+├── pyproject.toml       # Dependencies and project metadata (uv)
+└── .env                 # Secrets and local overrides (gitignored)
 ```
+
+## 🏗 Architectural Decisions
+
+This project maintains Architecture Decision Records (ADRs) to document significant design choices and their rationale. You can find them in the `docs/adr/` directory. These are excellent resources for understanding *why* certain technologies or patterns were chosen.
 
 ## 📚 Roadmap
 
