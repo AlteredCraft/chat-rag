@@ -11,7 +11,7 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 *   **Metrics Sidebar**: A dedicated right-hand sidebar displaying real-time session metrics, including model identification and token usage (prompt, completion, total).
 *   **Markdown Support**: Securely renders Markdown (including lists, code blocks, and formatting) using Marked.js and DOMPurify for sanitization. Works offline.
 *   **Modular Architecture**: Organized following Flask best practices (Blueprints, Application Factory pattern).
-*   **Centralized Logging**: Configurable logging for the app (DEBUG) and dependencies (INFO) with support for stdout and file output.
+*   **Centralized Logging**: Configurable logging for the app (DEBUG) and dependencies (INFO). Includes raw LLM response logging in `DEBUG` mode for inspecting provider metadata.
 *   **OpenRouter Integration**: Easy access to various state-of-the-art models via a single API.
 *   **Clean UI**: A responsive, modern chat interface built with raw HTML/CSS/JS (no heavy frontend frameworks).
 *   **Modern Python Tooling**: Uses `uv` for blazing fast dependency management.
@@ -83,9 +83,11 @@ This project maintains Architecture Decision Records (ADRs) to document signific
 
 *   [x] Basic Chat Interface
 *   [x] LLM Streaming
+*   [x] Conversation History (Multi-turn)
+*   [x] Metrics Sidebar (Token usage & Model info)
 *   [ ] **RAG Implementation**: Connect a vector database to query local documents.
 *   [ ] File Upload Support
-*   [ ] Chat History Persistence
+*   [ ] Chat History Persistence (Server-side)
 
 ## 📝 License
 
