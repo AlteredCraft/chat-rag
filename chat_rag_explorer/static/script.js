@@ -3,6 +3,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageInput = document.getElementById('message-input');
     const chatHistory = document.getElementById('chat-history');
     const submitButton = chatForm.querySelector('button');
+    const settingsLink = document.querySelector('.settings-link');
+    const confirmModal = document.getElementById('confirm-modal');
+    const modalCancel = document.getElementById('modal-cancel');
+    const modalOk = document.getElementById('modal-ok');
+
+    // Confirm before navigating to settings (resets chat)
+    if (settingsLink && confirmModal) {
+        settingsLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            confirmModal.classList.add('visible');
+        });
+
+        modalCancel.addEventListener('click', () => {
+            confirmModal.classList.remove('visible');
+        });
+
+        modalOk.addEventListener('click', () => {
+            window.location.href = settingsLink.href;
+        });
+
+        confirmModal.addEventListener('click', (e) => {
+            if (e.target === confirmModal) {
+                confirmModal.classList.remove('visible');
+            }
+        });
+    }
 
     const STORAGE_KEY = 'chat-rag-selected-model';
     const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
@@ -11,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function getCurrentModel() {
         return localStorage.getItem(STORAGE_KEY) || DEFAULT_MODEL;
     }
+
+    // Display current model on load
+    document.getElementById('metric-model').textContent = getCurrentModel();
 
     // Session-wide metrics
     let sessionMetrics = {

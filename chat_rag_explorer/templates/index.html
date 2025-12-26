@@ -35,11 +35,13 @@
 
             <aside class="sidebar">
                 <div class="sidebar-section">
-                    <h3>Last Interaction</h3>
                     <div class="metric">
                         <span class="label">Model:</span>
                         <span id="metric-model" class="value">-</span>
                     </div>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Last Interaction</h3>
                     <div class="metric">
                         <span class="label">Prompt Tokens:</span>
                         <span id="metric-prompt-tokens" class="value">0</span>
@@ -73,6 +75,16 @@
                     <p class="small">RAG context will appear here in future updates.</p>
                 </div>
             </aside>
+        </div>
+
+        <div id="confirm-modal" class="modal-overlay">
+            <div class="modal">
+                <p class="modal-message">Going to settings will reset the chat. Continue?</p>
+                <div class="modal-buttons">
+                    <button id="modal-cancel" class="modal-btn modal-btn-cancel">Cancel</button>
+                    <button id="modal-ok" class="modal-btn modal-btn-ok">OK</button>
+                </div>
+            </div>
         </div>
 
         <script src="/static/marked.min.js"></script>
