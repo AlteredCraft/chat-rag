@@ -316,6 +316,25 @@ button:disabled {
     color: #444;
 }
 
+.filter-row {
+    margin-bottom: 0.75rem;
+}
+
+.filter-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.filter-checkbox input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+}
+
 .select-wrapper {
     position: relative;
     display: flex;
@@ -408,6 +427,7 @@ button:disabled {
     line-height: 1.4;
     font-family: system-ui, -apple-system, sans-serif;
     font-style: italic;
+    white-space: pre-wrap;
 }
 
 .model-details .tags {

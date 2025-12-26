@@ -46,13 +46,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelSelect = document.getElementById('model-select');
     const loadingIndicator = document.getElementById('loading-indicator');
     const modelDetails = document.getElementById('model-details');
+    const freeOnlyFilter = document.getElementById('free-only-filter');
 
     const STORAGE_KEY = 'chat-rag-selected-model';
+    const FILTER_STORAGE_KEY = 'chat-rag-free-filter';
     const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
+
+    function isFreeModel(model) {
+        const pricing = model.pricing || {};
+        const promptPrice = parseFloat(pricing.prompt) || 0;
+        const completionPrice = parseFloat(pricing.completion) || 0;
+        return promptPrice === 0 && completionPrice === 0;
+    }
 
     let modelsData = [];
 
-    // Load models on page load
+    // Restore filter state and load models
+    freeOnlyFilter.checked = localStorage.getItem(FILTER_STORAGE_KEY) === 'true';
     loadModels();
 
     async function loadModels() {
@@ -96,9 +106,18 @@ document.addEventListener('DOMContentLoaded', () => {
         SettingsLogger.debug('Populating model select dropdown');
         modelSelect.innerHTML = '';
 
+        // Apply free filter if enabled
+        const showFreeOnly = freeOnlyFilter.checked;
+        const filteredModels = showFreeOnly ? models.filter(isFreeModel) : models;
+
+        if (filteredModels.length === 0) {
+            modelSelect.innerHTML = '<option value="">No models match filter</option>';
+            return;
+        }
+
         // Group models by provider
         const grouped = {};
-        models.forEach(model => {
+        filteredModels.forEach(model => {
             const provider = model.id.split('/')[0] || 'Other';
             if (!grouped[provider]) {
                 grouped[provider] = [];
@@ -127,7 +146,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         SettingsLogger.debug('Model select populated', {
             providers: sortedProviders.length,
-            totalModels: models.length
+            totalModels: filteredModels.length,
+            filtered: showFreeOnly
         });
     }
 
@@ -226,6 +246,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             updateModelDetails();
         }
+    });
+
+    freeOnlyFilter.addEventListener('change', () => {
+        localStorage.setItem(FILTER_STORAGE_KEY, freeOnlyFilter.checked);
+        SettingsLogger.info('Free filter toggled', { enabled: freeOnlyFilter.checked });
+        populateModelSelect(modelsData);
+        restoreSelectedModel();
     });
 
     SettingsLogger.info('Settings page initialized successfully');
