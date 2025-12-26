@@ -33,32 +33,43 @@ class ChatService:
             logger.debug("OpenAI client initialized successfully")
         return self.client
 
-    def chat_stream(self, messages, model=None, request_id=None):
+    def chat_stream(self, messages, model=None, temperature=None, top_p=None, request_id=None):
         """Stream chat completions from the LLM.
 
         Args:
             messages: Conversation messages to send
             model: Model identifier to use
+            temperature: Sampling temperature (0-2)
+            top_p: Nucleus sampling parameter (0-1)
             request_id: Optional request ID for log correlation
         """
         req_id = request_id or "no-id"
         client = self.get_client()
         target_model = model or current_app.config["DEFAULT_MODEL"]
 
-        logger.info(f"[{req_id}] Starting chat stream - Model: {target_model}")
+        logger.info(f"[{req_id}] Starting chat stream - Model: {target_model}, temperature: {temperature}, top_p: {top_p}")
         logger.debug(f"[{req_id}] Conversation context ({len(messages)} messages): {json.dumps(messages)}")
 
         stream_start_time = time.time()
         first_chunk_time = None
 
         try:
+            # Build API call parameters
+            api_params = {
+                "model": target_model,
+                "messages": messages,
+                "stream": True,
+                "stream_options": {"include_usage": True},
+            }
+
+            # Add optional parameters if provided
+            if temperature is not None:
+                api_params["temperature"] = temperature
+            if top_p is not None:
+                api_params["top_p"] = top_p
+
             # Note: stream_options={"include_usage": True} is required for token counts in streams
-            stream = client.chat.completions.create(
-                model=target_model,
-                messages=messages,
-                stream=True,
-                stream_options={"include_usage": True},
-            )
+            stream = client.chat.completions.create(**api_params)
 
             chunk_count = 0
             total_content_length = 0

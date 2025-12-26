@@ -50,13 +50,16 @@ def chat():
     data = request.json
     messages = data.get("messages", [])
     model = data.get("model")
+    temperature = data.get("temperature")
+    top_p = data.get("top_p")
 
     # Calculate total message content length for logging
     total_content_length = sum(len(m.get("content", "")) for m in messages)
 
     logger.info(
         f"[{request_id}] POST /api/chat - Model: {model}, "
-        f"Messages: {len(messages)}, Content length: {total_content_length} chars"
+        f"Messages: {len(messages)}, Content length: {total_content_length} chars, "
+        f"temperature: {temperature}, top_p: {top_p}"
     )
     logger.debug(f"[{request_id}] Message roles: {[m.get('role') for m in messages]}")
 
@@ -71,7 +74,7 @@ def chat():
         """Wrapper to add logging around the stream."""
         try:
             chunk_count = 0
-            for chunk in chat_service.chat_stream(messages, model, request_id):
+            for chunk in chat_service.chat_stream(messages, model, temperature, top_p, request_id):
                 chunk_count += 1
                 yield chunk
             elapsed = time.time() - start_time

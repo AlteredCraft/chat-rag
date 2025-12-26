@@ -243,14 +243,36 @@ button:disabled {
     text-decoration: underline;
 }
 
-.settings-link {
+.header-actions {
     position: absolute;
     right: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 1.5rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: color 0.2s;
+    line-height: 1;
+}
+
+.icon-btn:hover {
+    color: var(--primary-color);
+}
+
+.settings-link {
     color: #666;
     text-decoration: none;
-    font-size: 2.5rem;
+    font-size: 1.8rem;
     padding: 0.5rem;
     transition: color 0.2s;
+    line-height: 1;
 }
 
 .settings-link:hover {
@@ -524,4 +546,99 @@ button:disabled {
 
 .modal-btn-ok:hover {
     background-color: #0056b3;
+}
+
+/* Parameter Controls */
+.param-control {
+    margin-bottom: 1.25rem;
+}
+
+.param-control:last-child {
+    margin-bottom: 0;
+}
+
+.param-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.param-control label {
+    font-size: 0.9rem;
+    color: #555;
+    font-weight: 500;
+}
+
+.param-value {
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #333;
+    min-width: 2.5rem;
+    text-align: right;
+}
+
+.param-control input[type="range"] {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.param-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.param-control input[type="range"]::-webkit-slider-thumb:hover {
+    background: #0056b3;
+}
+
+.param-control input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    border: none;
+}
+
+.param-hint {
+    display: block;
+    font-size: 0.75rem;
+    color: #999;
+    margin-top: 0.25rem;
+    font-style: italic;
+}
+
+/* Disabled state */
+.param-control.disabled label,
+.param-control.disabled .param-value {
+    color: #aaa;
+}
+
+.param-control.disabled input[type="range"] {
+    background: #eee;
+    cursor: not-allowed;
+}
+
+.param-control.disabled input[type="range"]::-webkit-slider-thumb {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.param-control.disabled input[type="range"]::-moz-range-thumb {
+    background: #ccc;
+    cursor: not-allowed;
 }
