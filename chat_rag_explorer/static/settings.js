@@ -591,9 +591,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const ragTestBtn = document.getElementById('rag-test-btn');
     const ragSaveBtn = document.getElementById('rag-save-btn');
     const ragTestResult = document.getElementById('rag-test-result');
+    const ragCollectionSection = document.getElementById('rag-collection-section');
+    const ragCollectionSelect = document.getElementById('rag-collection-select');
 
     let originalRagConfig = null;
     let pathValidateTimeout = null;
+    let availableCollections = [];
 
     function getSelectedRagMode() {
         const selected = document.querySelector('input[name="rag-mode"]:checked');
@@ -605,6 +608,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ragLocalSettings.style.display = mode === 'local' ? 'block' : 'none';
         ragServerSettings.style.display = mode === 'server' ? 'block' : 'none';
         ragCloudSettings.style.display = mode === 'cloud' ? 'block' : 'none';
+
+        // Hide collection section when switching modes (connection needs to be re-tested)
+        ragCollectionSection.style.display = 'none';
+        ragTestResult.innerHTML = '';
 
         // Load API key status when switching to cloud mode
         if (mode === 'cloud') {
@@ -697,6 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ragTestBtn.disabled = true;
         ragTestBtn.textContent = 'Testing...';
         ragTestResult.innerHTML = '<div class="testing">Testing connection...</div>';
+        ragCollectionSection.style.display = 'none';
 
         const config = getCurrentRagConfig();
 
@@ -714,18 +722,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     <strong>Connection successful!</strong>
                     <p>${data.message}</p>`;
                 if (data.collections && data.collections.length > 0) {
-                    html += `<p>Collections: ${data.collections.join(', ')}</p>`;
+                    html += `<p>Found ${data.collections.length} collection(s)</p>`;
                 } else {
                     html += '<p>No collections found (empty database)</p>';
                 }
                 html += '</div>';
                 ragTestResult.innerHTML = html;
+
+                // Populate and show collection selector
+                availableCollections = data.collections || [];
+                populateCollectionSelect(availableCollections);
+                ragCollectionSection.style.display = 'block';
             } else {
                 ragTestResult.innerHTML = `
                     <div class="test-error">
                         <strong>Connection failed</strong>
                         <p>${data.message}</p>
                     </div>`;
+                ragCollectionSection.style.display = 'none';
             }
         } catch (error) {
             ragTestResult.innerHTML = `
@@ -733,10 +747,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     <strong>Test failed</strong>
                     <p>${error.message}</p>
                 </div>`;
+            ragCollectionSection.style.display = 'none';
         } finally {
             ragTestBtn.disabled = false;
             ragTestBtn.textContent = 'Test Connection';
         }
+    }
+
+    function populateCollectionSelect(collections) {
+        ragCollectionSelect.innerHTML = '<option value="">Select a collection...</option>';
+
+        collections.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            ragCollectionSelect.appendChild(option);
+        });
+
+        // Restore previously selected collection if available
+        const savedCollection = originalRagConfig?.collection;
+        if (savedCollection && collections.includes(savedCollection)) {
+            ragCollectionSelect.value = savedCollection;
+        }
+
+        SettingsLogger.debug('Collection select populated', { count: collections.length });
     }
 
     function getCurrentRagConfig() {
@@ -746,7 +780,8 @@ document.addEventListener('DOMContentLoaded', () => {
             server_host: ragServerHost.value.trim(),
             server_port: parseInt(ragServerPort.value) || 8000,
             cloud_tenant: ragTenantId.value.trim(),
-            cloud_database: ragDatabase.value.trim()
+            cloud_database: ragDatabase.value.trim(),
+            collection: ragCollectionSelect.value
         };
     }
 
@@ -758,7 +793,8 @@ document.addEventListener('DOMContentLoaded', () => {
                current.server_host !== (originalRagConfig.server_host || 'localhost') ||
                current.server_port !== (originalRagConfig.server_port || 8000) ||
                current.cloud_tenant !== (originalRagConfig.cloud_tenant || '') ||
-               current.cloud_database !== (originalRagConfig.cloud_database || '');
+               current.cloud_database !== (originalRagConfig.cloud_database || '') ||
+               current.collection !== (originalRagConfig.collection || '');
     }
 
     function validateRagForm() {
@@ -817,8 +853,15 @@ document.addEventListener('DOMContentLoaded', () => {
         radio.addEventListener('change', toggleRagMode);
     });
 
-    ragLocalPath.addEventListener('input', () => {
+    function onConnectionParamChange() {
+        // Hide collection section when connection parameters change
+        ragCollectionSection.style.display = 'none';
+        ragTestResult.innerHTML = '';
         updateRagSaveButtonState();
+    }
+
+    ragLocalPath.addEventListener('input', () => {
+        onConnectionParamChange();
         // Debounce path validation
         clearTimeout(pathValidateTimeout);
         pathValidateTimeout = setTimeout(() => {
@@ -826,10 +869,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 500);
     });
 
-    ragServerHost.addEventListener('input', updateRagSaveButtonState);
-    ragServerPort.addEventListener('input', updateRagSaveButtonState);
-    ragTenantId.addEventListener('input', updateRagSaveButtonState);
-    ragDatabase.addEventListener('input', updateRagSaveButtonState);
+    ragServerHost.addEventListener('input', onConnectionParamChange);
+    ragServerPort.addEventListener('input', onConnectionParamChange);
+    ragTenantId.addEventListener('input', onConnectionParamChange);
+    ragDatabase.addEventListener('input', onConnectionParamChange);
+    ragCollectionSelect.addEventListener('change', updateRagSaveButtonState);
 
     ragTestBtn.addEventListener('click', testRagConnection);
     ragSaveBtn.addEventListener('click', saveRagConfig);

@@ -161,6 +161,17 @@
 
                             <!-- Connection Test Result -->
                             <div id="rag-test-result" class="test-result"></div>
+
+                            <!-- Collection Selection (shown after successful connection) -->
+                            <div id="rag-collection-section" class="setting-item" style="display: none;">
+                                <label for="rag-collection-select">Collection</label>
+                                <div class="select-wrapper">
+                                    <select id="rag-collection-select">
+                                        <option value="">Select a collection...</option>
+                                    </select>
+                                </div>
+                                <span class="field-hint">Select a collection to use for RAG queries</span>
+                            </div>
                         </section>
                     </div>
                 </div>
