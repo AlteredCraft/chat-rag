@@ -47,32 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageInput = document.getElementById('message-input');
     const chatHistory = document.getElementById('chat-history');
     const submitButton = chatForm.querySelector('button');
-    const settingsLink = document.querySelector('.settings-link');
-    const confirmModal = document.getElementById('confirm-modal');
-    const modalCancel = document.getElementById('modal-cancel');
-    const modalOk = document.getElementById('modal-ok');
-
-    // Confirm before navigating to settings (resets chat)
-    if (settingsLink && confirmModal) {
-        settingsLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            confirmModal.classList.add('visible');
-        });
-
-        modalCancel.addEventListener('click', () => {
-            confirmModal.classList.remove('visible');
-        });
-
-        modalOk.addEventListener('click', () => {
-            window.location.href = settingsLink.href;
-        });
-
-        confirmModal.addEventListener('click', (e) => {
-            if (e.target === confirmModal) {
-                confirmModal.classList.remove('visible');
-            }
-        });
-    }
+    // Settings link navigates directly (chat is preserved in sessionStorage)
 
     // Clear chat button
     const clearChatBtn = document.getElementById('clear-chat-btn');
@@ -100,6 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
             total_tokens: 0
         };
 
+        // Clear sessionStorage
+        clearConversationSession();
+
         // Update metrics display
         document.getElementById('metric-prompt-tokens').textContent = '0';
         document.getElementById('metric-completion-tokens').textContent = '0';
@@ -118,6 +96,65 @@ document.addEventListener('DOMContentLoaded', () => {
     const PROMPT_STORAGE_KEY = 'chat-rag-selected-prompt';
     const DEFAULT_PROMPT = 'default_system_prompt';
     let currentSystemPrompt = 'You are a helpful assistant.'; // Fallback
+
+    // Session persistence keys (survives navigation, clears on tab close)
+    const SESSION_HISTORY_KEY = 'chat-rag-conversation-history';
+    const SESSION_METRICS_KEY = 'chat-rag-session-metrics';
+
+    // Save conversation to sessionStorage
+    function saveConversationToSession() {
+        sessionStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(conversationHistory));
+        sessionStorage.setItem(SESSION_METRICS_KEY, JSON.stringify(sessionMetrics));
+    }
+
+    // Clear conversation from sessionStorage
+    function clearConversationSession() {
+        sessionStorage.removeItem(SESSION_HISTORY_KEY);
+        sessionStorage.removeItem(SESSION_METRICS_KEY);
+    }
+
+    // Restore conversation from sessionStorage and re-render to DOM
+    function restoreConversationFromSession() {
+        const savedHistory = sessionStorage.getItem(SESSION_HISTORY_KEY);
+        const savedMetrics = sessionStorage.getItem(SESSION_METRICS_KEY);
+
+        if (savedHistory) {
+            try {
+                conversationHistory = JSON.parse(savedHistory);
+                AppLogger.info('Restored conversation from session', { messages: conversationHistory.length });
+
+                // Re-render messages to DOM (skip system message)
+                conversationHistory.forEach(msg => {
+                    if (msg.role === 'user') {
+                        appendMessage('user', msg.content);
+                    } else if (msg.role === 'assistant') {
+                        const contentDiv = appendMessage('bot', '');
+                        const html = marked.parse(msg.content);
+                        contentDiv.innerHTML = DOMPurify.sanitize(html);
+                    }
+                    // Skip system messages in UI
+                });
+
+                return true; // Restored
+            } catch (e) {
+                AppLogger.error('Failed to restore conversation', { error: e.message });
+            }
+        }
+
+        if (savedMetrics) {
+            try {
+                sessionMetrics = JSON.parse(savedMetrics);
+                // Update metrics display
+                document.getElementById('total-prompt-tokens').textContent = sessionMetrics.prompt_tokens;
+                document.getElementById('total-completion-tokens').textContent = sessionMetrics.completion_tokens;
+                document.getElementById('total-total-tokens').textContent = sessionMetrics.total_tokens;
+            } catch (e) {
+                AppLogger.error('Failed to restore metrics', { error: e.message });
+            }
+        }
+
+        return false; // Nothing to restore
+    }
 
     // Parameter controls
     const temperatureSlider = document.getElementById('temperature-slider');
@@ -226,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let conversationHistory = [];
 
     // Load system prompt from API
-    async function loadSystemPrompt() {
+    async function loadSystemPrompt(skipHistoryReset = false) {
         const promptId = localStorage.getItem(PROMPT_STORAGE_KEY) || DEFAULT_PROMPT;
         AppLogger.info('Loading system prompt', { promptId });
 
@@ -249,14 +286,17 @@ document.addEventListener('DOMContentLoaded', () => {
             currentSystemPrompt = 'You are a helpful assistant.';
         }
 
-        // Initialize or reset conversation with loaded prompt
-        conversationHistory = [
-            { role: 'system', content: currentSystemPrompt }
-        ];
+        // Initialize or reset conversation with loaded prompt (skip if restoring session)
+        if (!skipHistoryReset) {
+            conversationHistory = [
+                { role: 'system', content: currentSystemPrompt }
+            ];
+        }
     }
 
-    // Load system prompt on page initialization
-    loadSystemPrompt();
+    // Try to restore session first, otherwise load fresh
+    const restoredFromSession = restoreConversationFromSession();
+    loadSystemPrompt(restoredFromSession); // Skip history reset if we restored
 
     // Configure marked for better chat-style breaks
     marked.setOptions({
@@ -286,6 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add user message to history
         conversationHistory.push({ role: 'user', content: message });
+        saveConversationToSession();
 
         // Add user message UI
         appendMessage('user', message);
@@ -384,6 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add bot message to history
             if (messageBuffer) {
                 conversationHistory.push({ role: 'assistant', content: messageBuffer });
+                saveConversationToSession();
             }
 
         } catch (error) {
