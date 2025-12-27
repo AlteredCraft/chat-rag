@@ -88,9 +88,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear UI
         chatHistory.innerHTML = '';
 
-        // Reset conversation history (keep system message)
+        // Reset conversation history (use current system prompt)
         conversationHistory = [
-            { role: 'system', content: 'You are a helpful assistant.' }
+            { role: 'system', content: currentSystemPrompt }
         ];
 
         // Reset session metrics
@@ -113,6 +113,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const STORAGE_KEY = 'chat-rag-selected-model';
     const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
+
+    // Prompt selection constants
+    const PROMPT_STORAGE_KEY = 'chat-rag-selected-prompt';
+    const DEFAULT_PROMPT = 'default_system_prompt';
+    let currentSystemPrompt = 'You are a helpful assistant.'; // Fallback
 
     // Parameter controls
     const temperatureSlider = document.getElementById('temperature-slider');
@@ -196,6 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('metric-model').textContent = e.newValue || DEFAULT_MODEL;
             updateParameterControls();
         }
+        if (e.key === PROMPT_STORAGE_KEY) {
+            AppLogger.info('Prompt changed via storage event', { newPrompt: e.newValue });
+            loadSystemPrompt();
+        }
     });
 
     // Display current model on load
@@ -213,10 +222,41 @@ document.addEventListener('DOMContentLoaded', () => {
         total_tokens: 0
     };
 
-    // Conversation history
-    let conversationHistory = [
-        { role: 'system', content: 'You are a helpful assistant.' }
-    ];
+    // Conversation history (initialized after loading system prompt)
+    let conversationHistory = [];
+
+    // Load system prompt from API
+    async function loadSystemPrompt() {
+        const promptId = localStorage.getItem(PROMPT_STORAGE_KEY) || DEFAULT_PROMPT;
+        AppLogger.info('Loading system prompt', { promptId });
+
+        try {
+            const response = await fetch(`/api/prompts/${promptId}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.data && data.data.content) {
+                currentSystemPrompt = data.data.content;
+                AppLogger.info('System prompt loaded', {
+                    promptId,
+                    contentLength: currentSystemPrompt.length
+                });
+            }
+        } catch (error) {
+            AppLogger.warn('Failed to load system prompt, using default', { error: error.message });
+            currentSystemPrompt = 'You are a helpful assistant.';
+        }
+
+        // Initialize or reset conversation with loaded prompt
+        conversationHistory = [
+            { role: 'system', content: currentSystemPrompt }
+        ];
+    }
+
+    // Load system prompt on page initialization
+    loadSystemPrompt();
 
     // Configure marked for better chat-style breaks
     marked.setOptions({

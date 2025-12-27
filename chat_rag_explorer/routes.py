@@ -3,6 +3,7 @@ import time
 import uuid
 from flask import Blueprint, render_template, request, Response, stream_with_context, jsonify
 from chat_rag_explorer.services import chat_service
+from chat_rag_explorer.prompt_service import prompt_service
 
 main_bp = Blueprint("main", __name__)
 logger = logging.getLogger(__name__)
@@ -39,6 +40,43 @@ def get_models():
     except Exception as e:
         elapsed = time.time() - start_time
         logger.error(f"[{request_id}] GET /api/models - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@main_bp.route("/api/prompts")
+def get_prompts():
+    request_id = generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] GET /api/prompts - Fetching available prompts")
+
+    try:
+        prompts = prompt_service.get_prompts(request_id)
+        elapsed = time.time() - start_time
+        logger.info(f"[{request_id}] GET /api/prompts - Returned {len(prompts)} prompts ({elapsed:.3f}s)")
+        return jsonify({"data": prompts})
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] GET /api/prompts - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@main_bp.route("/api/prompts/<prompt_id>")
+def get_prompt(prompt_id):
+    request_id = generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] GET /api/prompts/{prompt_id} - Fetching prompt content")
+
+    try:
+        prompt = prompt_service.get_prompt_by_id(prompt_id, request_id)
+        if prompt is None:
+            logger.warning(f"[{request_id}] GET /api/prompts/{prompt_id} - Not found")
+            return jsonify({"error": "Prompt not found"}), 404
+        elapsed = time.time() - start_time
+        logger.info(f"[{request_id}] GET /api/prompts/{prompt_id} - Success ({elapsed:.3f}s)")
+        return jsonify({"data": prompt})
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] GET /api/prompts/{prompt_id} - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 

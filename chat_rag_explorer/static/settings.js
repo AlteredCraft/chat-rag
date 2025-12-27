@@ -52,6 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const FILTER_STORAGE_KEY = 'chat-rag-free-filter';
     const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
 
+    // Prompt selection elements and constants
+    const PROMPT_STORAGE_KEY = 'chat-rag-selected-prompt';
+    const DEFAULT_PROMPT = 'default_system_prompt';
+    const promptSelect = document.getElementById('prompt-select');
+    const promptLoadingIndicator = document.getElementById('prompt-loading-indicator');
+    const promptDetails = document.getElementById('prompt-details');
+
     function isFreeModel(model) {
         const pricing = model.pricing || {};
         const promptPrice = parseFloat(pricing.prompt) || 0;
@@ -60,10 +67,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let modelsData = [];
+    let promptsData = [];
 
     // Restore filter state and load models
     freeOnlyFilter.checked = localStorage.getItem(FILTER_STORAGE_KEY) === 'true';
     loadModels();
+    loadPrompts();
 
     async function loadModels() {
         SettingsLogger.info('Loading models from API');
@@ -253,6 +262,110 @@ document.addEventListener('DOMContentLoaded', () => {
         SettingsLogger.info('Free filter toggled', { enabled: freeOnlyFilter.checked });
         populateModelSelect(modelsData);
         restoreSelectedModel();
+    });
+
+    // ===== Prompt Selection Functions =====
+
+    async function loadPrompts() {
+        SettingsLogger.info('Loading prompts from API');
+        const startTime = performance.now();
+        promptLoadingIndicator.classList.add('active');
+
+        try {
+            const response = await fetch('/api/prompts');
+            if (!response.ok) {
+                SettingsLogger.error('Prompts API returned error', { status: response.status });
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            promptsData = data.data || [];
+
+            const elapsed = performance.now() - startTime;
+            SettingsLogger.info('Prompts loaded successfully', {
+                count: promptsData.length,
+                loadTime_ms: elapsed.toFixed(2)
+            });
+
+            populatePromptSelect(promptsData);
+            restoreSelectedPrompt();
+
+        } catch (error) {
+            const elapsed = performance.now() - startTime;
+            SettingsLogger.error('Failed to load prompts', {
+                error: error.message,
+                loadTime_ms: elapsed.toFixed(2)
+            });
+            promptSelect.innerHTML = '<option value="">Failed to load prompts</option>';
+        } finally {
+            promptLoadingIndicator.classList.remove('active');
+            promptSelect.disabled = false;
+        }
+    }
+
+    function populatePromptSelect(prompts) {
+        SettingsLogger.debug('Populating prompt select dropdown');
+        promptSelect.innerHTML = '';
+
+        if (prompts.length === 0) {
+            promptSelect.innerHTML = '<option value="">No prompts available</option>';
+            return;
+        }
+
+        prompts.forEach(prompt => {
+            const option = document.createElement('option');
+            option.value = prompt.id;
+            option.textContent = prompt.title || prompt.id;
+            promptSelect.appendChild(option);
+        });
+
+        SettingsLogger.debug('Prompt select populated', { totalPrompts: prompts.length });
+    }
+
+    function restoreSelectedPrompt() {
+        const savedPrompt = localStorage.getItem(PROMPT_STORAGE_KEY);
+        SettingsLogger.debug('Restoring selected prompt', { savedPrompt: savedPrompt || '(none)' });
+
+        if (savedPrompt && promptSelect.querySelector(`option[value="${savedPrompt}"]`)) {
+            promptSelect.value = savedPrompt;
+            SettingsLogger.info('Restored previously saved prompt', { prompt: savedPrompt });
+        } else if (promptSelect.querySelector(`option[value="${DEFAULT_PROMPT}"]`)) {
+            promptSelect.value = DEFAULT_PROMPT;
+            localStorage.setItem(PROMPT_STORAGE_KEY, DEFAULT_PROMPT);
+            SettingsLogger.info('Using default prompt (no saved selection)', { prompt: DEFAULT_PROMPT });
+        }
+        updatePromptDetails();
+    }
+
+    function updatePromptDetails() {
+        const selectedPrompt = promptsData.find(p => p.id === promptSelect.value);
+        if (!selectedPrompt) {
+            promptDetails.classList.remove('visible');
+            return;
+        }
+
+        promptDetails.innerHTML = `
+            ${selectedPrompt.description ? `<div class="detail-row description"><span class="detail-value">${selectedPrompt.description}</span></div>` : ''}
+            <div class="detail-row">
+                <span class="detail-label">Prompt ID:</span>
+                <span class="detail-value">${selectedPrompt.id}</span>
+            </div>
+        `;
+        promptDetails.classList.add('visible');
+    }
+
+    promptSelect.addEventListener('change', () => {
+        const selectedPrompt = promptSelect.value;
+        const previousPrompt = localStorage.getItem(PROMPT_STORAGE_KEY);
+
+        if (selectedPrompt) {
+            localStorage.setItem(PROMPT_STORAGE_KEY, selectedPrompt);
+            SettingsLogger.info('Prompt selection changed', {
+                previousPrompt: previousPrompt || '(none)',
+                newPrompt: selectedPrompt
+            });
+            updatePromptDetails();
+        }
     });
 
     SettingsLogger.info('Settings page initialized successfully');
