@@ -212,3 +212,6 @@ __marimo__/
 prompts/*
 !prompts/.gitkeep
 
+# RAG config (user-specific)
+rag_config.json
+
