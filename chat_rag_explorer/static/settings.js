@@ -43,6 +43,32 @@ const SettingsLogger = {
 document.addEventListener('DOMContentLoaded', () => {
     SettingsLogger.info('Settings page initializing');
 
+    // Tab navigation
+    const TAB_STORAGE_KEY = 'chat-rag-settings-tab';
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    function switchTab(tabId) {
+        tabButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabId);
+        });
+        tabPanels.forEach(panel => {
+            panel.classList.toggle('active', panel.dataset.panel === tabId);
+        });
+        localStorage.setItem(TAB_STORAGE_KEY, tabId);
+        SettingsLogger.debug('Tab switched', { tab: tabId });
+    }
+
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+
+    // Restore last active tab
+    const savedTab = localStorage.getItem(TAB_STORAGE_KEY);
+    if (savedTab && document.querySelector(`[data-tab="${savedTab}"]`)) {
+        switchTab(savedTab);
+    }
+
     const modelSelect = document.getElementById('model-select');
     const loadingIndicator = document.getElementById('loading-indicator');
     const modelDetails = document.getElementById('model-details');
