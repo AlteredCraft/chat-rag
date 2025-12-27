@@ -796,3 +796,165 @@ button:disabled {
     background-color: #ccc;
     cursor: not-allowed;
 }
+
+/* RAG Settings Styles */
+.mode-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.mode-radio {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mode-radio:hover {
+    border-color: var(--primary-color);
+    background-color: rgba(0, 123, 255, 0.02);
+}
+
+.mode-radio:has(input:checked) {
+    border-color: var(--primary-color);
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.mode-radio input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.radio-label {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.25rem;
+}
+
+.radio-description {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.rag-mode-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #eee;
+}
+
+.validation-status {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    min-height: 1.25rem;
+}
+
+.validation-status .validating,
+.status-checking {
+    color: #666;
+    font-style: italic;
+}
+
+.status-ok {
+    color: #28a745;
+    font-weight: 500;
+}
+
+.status-error {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+.api-key-status {
+    padding: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.api-key-status.error {
+    background-color: #fff5f5;
+    border: 1px solid #ffcccc;
+}
+
+.api-key-status code {
+    font-family: "SFMono-Regular", Consolas, monospace;
+    background: #e9ecef;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.field-hint {
+    display: block;
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.5rem;
+    font-style: italic;
+}
+
+.rag-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid #eee;
+    margin-top: 1.5rem;
+}
+
+.test-result {
+    margin-top: 1rem;
+    border-radius: 0.5rem;
+}
+
+.test-result:empty {
+    display: none;
+}
+
+.test-result .testing {
+    color: #666;
+    font-style: italic;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+}
+
+.test-result .test-success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+.test-result .test-error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+.test-result strong {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.test-result p {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+}
+
+.setting-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: #444;
+}

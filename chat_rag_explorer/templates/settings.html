@@ -20,7 +20,7 @@
                     <nav class="settings-tabs">
                         <button class="tab-btn active" data-tab="model">Model Selection</button>
                         <button class="tab-btn" data-tab="prompt">System Prompt</button>
-                        <button class="tab-btn" data-tab="future">Future Settings</button>
+                        <button class="tab-btn" data-tab="rag">RAG Settings</button>
                     </nav>
 
                     <div class="tab-panels">
@@ -83,13 +83,84 @@
                             </div>
                         </section>
 
-                        <section class="tab-panel" data-panel="future">
-                            <p class="section-description">More configuration options will be available here in future updates.</p>
-                            <div class="placeholder-items">
-                                <div class="placeholder-item">Temperature & Parameters</div>
-                                <div class="placeholder-item">RAG Settings</div>
-                                <div class="placeholder-item">Theme Preferences</div>
+                        <section class="tab-panel" data-panel="rag">
+                            <p class="section-description">Configure ChromaDB for Retrieval-Augmented Generation (RAG).</p>
+
+                            <!-- Mode Selection -->
+                            <div class="setting-item">
+                                <label class="setting-label">Connection Mode</label>
+                                <div class="mode-radio-group">
+                                    <label class="mode-radio">
+                                        <input type="radio" name="rag-mode" value="local" checked>
+                                        <span class="radio-label">Local (PersistentClient)</span>
+                                        <span class="radio-description">Direct file-based storage on this machine</span>
+                                    </label>
+                                    <label class="mode-radio">
+                                        <input type="radio" name="rag-mode" value="server">
+                                        <span class="radio-label">Local Server (HttpClient)</span>
+                                        <span class="radio-description">Connect to a ChromaDB server running locally</span>
+                                    </label>
+                                    <label class="mode-radio">
+                                        <input type="radio" name="rag-mode" value="cloud">
+                                        <span class="radio-label">Cloud (ChromaDB Cloud)</span>
+                                        <span class="radio-description">Connect to ChromaDB Cloud service</span>
+                                    </label>
+                                </div>
                             </div>
+
+                            <!-- Local Mode Settings -->
+                            <div id="rag-local-settings" class="rag-mode-section">
+                                <div class="setting-item">
+                                    <label for="rag-local-path">ChromaDB Path</label>
+                                    <input type="text" id="rag-local-path" class="text-input"
+                                           placeholder="/path/to/chromadb">
+                                    <div id="rag-path-status" class="validation-status"></div>
+                                </div>
+                            </div>
+
+                            <!-- Server Mode Settings -->
+                            <div id="rag-server-settings" class="rag-mode-section" style="display: none;">
+                                <div class="setting-item">
+                                    <label for="rag-server-host">Host</label>
+                                    <input type="text" id="rag-server-host" class="text-input"
+                                           placeholder="localhost" value="localhost">
+                                </div>
+                                <div class="setting-item">
+                                    <label for="rag-server-port">Port</label>
+                                    <input type="number" id="rag-server-port" class="text-input"
+                                           placeholder="8000" value="8000">
+                                </div>
+                            </div>
+
+                            <!-- Cloud Mode Settings -->
+                            <div id="rag-cloud-settings" class="rag-mode-section" style="display: none;">
+                                <div class="setting-item">
+                                    <label for="rag-tenant-id">Tenant ID</label>
+                                    <input type="text" id="rag-tenant-id" class="text-input"
+                                           placeholder="Enter your ChromaDB tenant ID">
+                                </div>
+                                <div class="setting-item">
+                                    <label for="rag-database">Database Name</label>
+                                    <input type="text" id="rag-database" class="text-input"
+                                           placeholder="Enter database name">
+                                </div>
+                                <div class="setting-item">
+                                    <label>API Key Status</label>
+                                    <div id="rag-api-key-status" class="api-key-status">
+                                        <span class="status-checking">Checking...</span>
+                                    </div>
+                                    <span class="field-hint">API key is configured via CHROMADB_API_KEY environment variable</span>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="setting-item rag-actions">
+                                <button type="button" id="rag-test-btn" class="toolbar-btn">Test Connection</button>
+                                <button type="button" id="rag-save-btn" class="save-btn" disabled>Save Settings</button>
+                            </div>
+
+                            <!-- Connection Test Result -->
+                            <div id="rag-test-result" class="test-result"></div>
                         </section>
                     </div>
                 </div>

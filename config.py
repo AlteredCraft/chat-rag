@@ -9,6 +9,9 @@ class Config:
     OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
     DEFAULT_MODEL = "openai/gpt-3.5-turbo"
 
+    # ChromaDB Configuration
+    CHROMADB_API_KEY = os.getenv("CHROMADB_API_KEY")
+
     # Logging Configuration
     LOG_LEVEL_APP = os.getenv("LOG_LEVEL_APP", "DEBUG")
     LOG_LEVEL_DEPS = os.getenv("LOG_LEVEL_DEPS", "INFO")

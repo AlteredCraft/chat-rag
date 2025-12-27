@@ -572,5 +572,270 @@ document.addEventListener('DOMContentLoaded', () => {
     deleteModalCancel.addEventListener('click', hideDeleteModal);
     deleteModalOk.addEventListener('click', deletePrompt);
 
+    // ===== RAG Settings Functions =====
+
+    const RAG_CONFIG_KEY = 'chat-rag-rag-config';
+
+    // DOM Elements
+    const ragModeRadios = document.querySelectorAll('input[name="rag-mode"]');
+    const ragLocalSettings = document.getElementById('rag-local-settings');
+    const ragServerSettings = document.getElementById('rag-server-settings');
+    const ragCloudSettings = document.getElementById('rag-cloud-settings');
+    const ragLocalPath = document.getElementById('rag-local-path');
+    const ragPathStatus = document.getElementById('rag-path-status');
+    const ragServerHost = document.getElementById('rag-server-host');
+    const ragServerPort = document.getElementById('rag-server-port');
+    const ragTenantId = document.getElementById('rag-tenant-id');
+    const ragDatabase = document.getElementById('rag-database');
+    const ragApiKeyStatus = document.getElementById('rag-api-key-status');
+    const ragTestBtn = document.getElementById('rag-test-btn');
+    const ragSaveBtn = document.getElementById('rag-save-btn');
+    const ragTestResult = document.getElementById('rag-test-result');
+
+    let originalRagConfig = null;
+    let pathValidateTimeout = null;
+
+    function getSelectedRagMode() {
+        const selected = document.querySelector('input[name="rag-mode"]:checked');
+        return selected ? selected.value : 'local';
+    }
+
+    function toggleRagMode() {
+        const mode = getSelectedRagMode();
+        ragLocalSettings.style.display = mode === 'local' ? 'block' : 'none';
+        ragServerSettings.style.display = mode === 'server' ? 'block' : 'none';
+        ragCloudSettings.style.display = mode === 'cloud' ? 'block' : 'none';
+
+        // Load API key status when switching to cloud mode
+        if (mode === 'cloud') {
+            loadApiKeyStatus();
+        }
+
+        updateRagSaveButtonState();
+        SettingsLogger.debug('RAG mode toggled', { mode });
+    }
+
+    async function loadRagConfig() {
+        SettingsLogger.info('Loading RAG configuration');
+        try {
+            const response = await fetch('/api/rag/config');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+            originalRagConfig = data.data;
+
+            // Populate form
+            const modeRadio = document.querySelector(`input[name="rag-mode"][value="${originalRagConfig.mode}"]`);
+            if (modeRadio) modeRadio.checked = true;
+
+            ragLocalPath.value = originalRagConfig.local_path || '';
+            ragServerHost.value = originalRagConfig.server_host || 'localhost';
+            ragServerPort.value = originalRagConfig.server_port || 8000;
+            ragTenantId.value = originalRagConfig.cloud_tenant || '';
+            ragDatabase.value = originalRagConfig.cloud_database || '';
+
+            toggleRagMode();
+
+            SettingsLogger.info('RAG config loaded', originalRagConfig);
+        } catch (error) {
+            SettingsLogger.error('Failed to load RAG config', { error: error.message });
+        }
+    }
+
+    async function loadApiKeyStatus() {
+        try {
+            const response = await fetch('/api/rag/api-key-status');
+            const data = await response.json();
+
+            if (data.configured) {
+                ragApiKeyStatus.innerHTML = `
+                    <span class="status-ok">Configured</span>
+                    <code>${data.masked}</code>
+                `;
+                ragApiKeyStatus.classList.remove('error');
+            } else {
+                ragApiKeyStatus.innerHTML = `
+                    <span class="status-error">Not configured</span>
+                    <span class="field-hint">Add CHROMADB_API_KEY to your .env file</span>
+                `;
+                ragApiKeyStatus.classList.add('error');
+            }
+        } catch (error) {
+            SettingsLogger.error('Failed to check API key status', { error: error.message });
+            ragApiKeyStatus.innerHTML = '<span class="status-error">Error checking status</span>';
+        }
+    }
+
+    async function validateLocalPath(path) {
+        if (!path.trim()) {
+            ragPathStatus.innerHTML = '';
+            return;
+        }
+
+        ragPathStatus.innerHTML = '<span class="validating">Validating...</span>';
+
+        try {
+            const response = await fetch('/api/rag/validate-path', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path })
+            });
+
+            const data = await response.json();
+
+            if (data.valid) {
+                ragPathStatus.innerHTML = `<span class="status-ok">${data.message}</span>`;
+            } else {
+                ragPathStatus.innerHTML = `<span class="status-error">${data.message}</span>`;
+            }
+        } catch (error) {
+            ragPathStatus.innerHTML = '<span class="status-error">Validation failed</span>';
+        }
+    }
+
+    async function testRagConnection() {
+        ragTestBtn.disabled = true;
+        ragTestBtn.textContent = 'Testing...';
+        ragTestResult.innerHTML = '<div class="testing">Testing connection...</div>';
+
+        const config = getCurrentRagConfig();
+
+        try {
+            const response = await fetch('/api/rag/test-connection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                let html = `<div class="test-success">
+                    <strong>Connection successful!</strong>
+                    <p>${data.message}</p>`;
+                if (data.collections && data.collections.length > 0) {
+                    html += `<p>Collections: ${data.collections.join(', ')}</p>`;
+                } else {
+                    html += '<p>No collections found (empty database)</p>';
+                }
+                html += '</div>';
+                ragTestResult.innerHTML = html;
+            } else {
+                ragTestResult.innerHTML = `
+                    <div class="test-error">
+                        <strong>Connection failed</strong>
+                        <p>${data.message}</p>
+                    </div>`;
+            }
+        } catch (error) {
+            ragTestResult.innerHTML = `
+                <div class="test-error">
+                    <strong>Test failed</strong>
+                    <p>${error.message}</p>
+                </div>`;
+        } finally {
+            ragTestBtn.disabled = false;
+            ragTestBtn.textContent = 'Test Connection';
+        }
+    }
+
+    function getCurrentRagConfig() {
+        return {
+            mode: getSelectedRagMode(),
+            local_path: ragLocalPath.value.trim(),
+            server_host: ragServerHost.value.trim(),
+            server_port: parseInt(ragServerPort.value) || 8000,
+            cloud_tenant: ragTenantId.value.trim(),
+            cloud_database: ragDatabase.value.trim()
+        };
+    }
+
+    function hasRagConfigChanges() {
+        if (!originalRagConfig) return false;
+        const current = getCurrentRagConfig();
+        return current.mode !== originalRagConfig.mode ||
+               current.local_path !== (originalRagConfig.local_path || '') ||
+               current.server_host !== (originalRagConfig.server_host || 'localhost') ||
+               current.server_port !== (originalRagConfig.server_port || 8000) ||
+               current.cloud_tenant !== (originalRagConfig.cloud_tenant || '') ||
+               current.cloud_database !== (originalRagConfig.cloud_database || '');
+    }
+
+    function validateRagForm() {
+        const mode = getSelectedRagMode();
+        if (mode === 'local') {
+            return ragLocalPath.value.trim().length > 0;
+        } else if (mode === 'server') {
+            return ragServerHost.value.trim().length > 0 && ragServerPort.value;
+        } else if (mode === 'cloud') {
+            return ragTenantId.value.trim().length > 0 && ragDatabase.value.trim().length > 0;
+        }
+        return false;
+    }
+
+    function updateRagSaveButtonState() {
+        const hasChanges = hasRagConfigChanges();
+        const isValid = validateRagForm();
+        ragSaveBtn.disabled = !hasChanges || !isValid;
+    }
+
+    async function saveRagConfig() {
+        ragSaveBtn.disabled = true;
+        ragSaveBtn.textContent = 'Saving...';
+
+        const config = getCurrentRagConfig();
+
+        try {
+            const response = await fetch('/api/rag/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to save');
+            }
+
+            originalRagConfig = config;
+            SettingsLogger.info('RAG config saved', config);
+
+            // Clear test result on successful save
+            ragTestResult.innerHTML = '';
+
+        } catch (error) {
+            SettingsLogger.error('Failed to save RAG config', { error: error.message });
+            alert('Failed to save: ' + error.message);
+        } finally {
+            ragSaveBtn.textContent = 'Save Settings';
+            updateRagSaveButtonState();
+        }
+    }
+
+    // RAG Event listeners
+    ragModeRadios.forEach(radio => {
+        radio.addEventListener('change', toggleRagMode);
+    });
+
+    ragLocalPath.addEventListener('input', () => {
+        updateRagSaveButtonState();
+        // Debounce path validation
+        clearTimeout(pathValidateTimeout);
+        pathValidateTimeout = setTimeout(() => {
+            validateLocalPath(ragLocalPath.value);
+        }, 500);
+    });
+
+    ragServerHost.addEventListener('input', updateRagSaveButtonState);
+    ragServerPort.addEventListener('input', updateRagSaveButtonState);
+    ragTenantId.addEventListener('input', updateRagSaveButtonState);
+    ragDatabase.addEventListener('input', updateRagSaveButtonState);
+
+    ragTestBtn.addEventListener('click', testRagConnection);
+    ragSaveBtn.addEventListener('click', saveRagConfig);
+
+    // Load RAG config on page load
+    loadRagConfig();
+
     SettingsLogger.info('Settings page initialized successfully');
 });

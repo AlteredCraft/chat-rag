@@ -4,6 +4,7 @@ import uuid
 from flask import Blueprint, render_template, request, Response, stream_with_context, jsonify
 from chat_rag_explorer.services import chat_service
 from chat_rag_explorer.prompt_service import prompt_service
+from chat_rag_explorer.rag_config_service import rag_config_service
 
 main_bp = Blueprint("main", __name__)
 logger = logging.getLogger(__name__)
@@ -232,3 +233,105 @@ def chat():
         stream_with_context(stream_with_logging()),
         mimetype="text/plain",
     )
+
+
+# ==================== RAG Configuration Endpoints ====================
+
+
+@main_bp.route("/api/rag/config")
+def get_rag_config():
+    """GET - Retrieve current RAG configuration."""
+    request_id = generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] GET /api/rag/config - Fetching RAG configuration")
+
+    try:
+        config = rag_config_service.get_config(request_id)
+        elapsed = time.time() - start_time
+        logger.info(f"[{request_id}] GET /api/rag/config - Success ({elapsed:.3f}s)")
+        return jsonify({"data": config})
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] GET /api/rag/config - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@main_bp.route("/api/rag/config", methods=["POST"])
+def save_rag_config():
+    """POST - Save RAG configuration."""
+    request_id = generate_request_id()
+    start_time = time.time()
+
+    data = request.json
+    logger.info(f"[{request_id}] POST /api/rag/config - Saving RAG configuration (mode: {data.get('mode')})")
+
+    try:
+        result = rag_config_service.save_config(data, request_id)
+        elapsed = time.time() - start_time
+
+        if 'error' in result:
+            logger.warning(f"[{request_id}] POST /api/rag/config - Validation failed: {result['error']}")
+            return jsonify(result), 400
+
+        logger.info(f"[{request_id}] POST /api/rag/config - Saved ({elapsed:.3f}s)")
+        return jsonify({"data": result['config']})
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] POST /api/rag/config - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@main_bp.route("/api/rag/validate-path", methods=["POST"])
+def validate_rag_path():
+    """POST - Validate a local ChromaDB path."""
+    request_id = generate_request_id()
+    start_time = time.time()
+
+    data = request.json
+    path = data.get("path", "")
+    logger.info(f"[{request_id}] POST /api/rag/validate-path - Validating: {path}")
+
+    try:
+        result = rag_config_service.validate_local_path(path, request_id)
+        elapsed = time.time() - start_time
+        logger.info(f"[{request_id}] POST /api/rag/validate-path - Valid: {result['valid']} ({elapsed:.3f}s)")
+        return jsonify(result)
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] POST /api/rag/validate-path - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"valid": False, "message": str(e)}), 500
+
+
+@main_bp.route("/api/rag/test-connection", methods=["POST"])
+def test_rag_connection():
+    """POST - Test ChromaDB connection with provided config."""
+    request_id = generate_request_id()
+    start_time = time.time()
+
+    data = request.json
+    mode = data.get("mode", "local")
+    logger.info(f"[{request_id}] POST /api/rag/test-connection - Testing connection (mode: {mode})")
+
+    try:
+        result = rag_config_service.test_connection(data, request_id)
+        elapsed = time.time() - start_time
+        logger.info(f"[{request_id}] POST /api/rag/test-connection - Success: {result['success']} ({elapsed:.3f}s)")
+        return jsonify(result)
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] POST /api/rag/test-connection - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@main_bp.route("/api/rag/api-key-status")
+def get_rag_api_key_status():
+    """GET - Check if CHROMADB_API_KEY is configured."""
+    request_id = generate_request_id()
+    logger.debug(f"[{request_id}] GET /api/rag/api-key-status - Checking API key status")
+
+    try:
+        result = rag_config_service.get_api_key_status(request_id)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[{request_id}] GET /api/rag/api-key-status - Failed: {str(e)}", exc_info=True)
+        return jsonify({"configured": False, "masked": None}), 500
