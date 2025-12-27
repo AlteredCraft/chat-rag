@@ -114,7 +114,7 @@ class RagConfigService:
             return {'error': f'Failed to save config: {str(e)}'}
 
     def validate_local_path(self, path, request_id=None):
-        """Validate that a local path exists and is suitable for ChromaDB."""
+        """Validate that a local path contains an existing ChromaDB database."""
         log_prefix = f"[{request_id}] " if request_id else ""
 
         if not path:
@@ -124,17 +124,10 @@ class RagConfigService:
 
         # Check if path exists
         if not path_obj.exists():
-            # Check if parent exists (path could be created)
-            if path_obj.parent.exists():
-                return {
-                    'valid': True,
-                    'message': 'Directory will be created',
-                    'details': {'exists': False, 'will_create': True}
-                }
             return {
                 'valid': False,
-                'message': 'Parent directory does not exist',
-                'details': {'exists': False, 'parent_exists': False}
+                'message': 'Path does not exist',
+                'details': {'exists': False}
             }
 
         # Check if it's a directory
@@ -145,27 +138,20 @@ class RagConfigService:
                 'details': {'exists': True, 'is_directory': False}
             }
 
-        # Check write permissions
-        try:
-            test_file = path_obj / '.chroma_write_test'
-            test_file.touch()
-            test_file.unlink()
-            writable = True
-        except Exception:
-            writable = False
-
-        if not writable:
+        # Check for ChromaDB database files
+        chroma_db_file = path_obj / 'chroma.sqlite3'
+        if not chroma_db_file.exists():
             return {
                 'valid': False,
-                'message': 'Directory is not writable',
-                'details': {'exists': True, 'is_directory': True, 'writable': False}
+                'message': 'No ChromaDB database found at this path',
+                'details': {'exists': True, 'is_directory': True, 'has_database': False}
             }
 
         logger.debug(f"{log_prefix}Path validated: {path}")
         return {
             'valid': True,
-            'message': 'Valid directory',
-            'details': {'exists': True, 'is_directory': True, 'writable': True}
+            'message': 'Valid ChromaDB database',
+            'details': {'exists': True, 'is_directory': True, 'has_database': True}
         }
 
     def test_connection(self, config_data, request_id=None):
@@ -179,8 +165,24 @@ class RagConfigService:
                 if not path:
                     return {'success': False, 'message': 'Local path is required'}
 
-                # Create directory if it doesn't exist
-                Path(path).mkdir(parents=True, exist_ok=True)
+                path_obj = Path(path)
+
+                # Check if path exists
+                if not path_obj.exists():
+                    return {'success': False, 'message': f'Path does not exist: {path}'}
+
+                # Check if it's a directory
+                if not path_obj.is_dir():
+                    return {'success': False, 'message': f'Path is not a directory: {path}'}
+
+                # Check for ChromaDB database files (chroma.sqlite3 is the main marker)
+                chroma_db_file = path_obj / 'chroma.sqlite3'
+                if not chroma_db_file.exists():
+                    return {
+                        'success': False,
+                        'message': f'No ChromaDB database found at {path}',
+                        'details': 'Expected chroma.sqlite3 file not found. Ensure the path points to an existing ChromaDB database.'
+                    }
 
                 client = chromadb.PersistentClient(path=path)
                 collections = client.list_collections()
