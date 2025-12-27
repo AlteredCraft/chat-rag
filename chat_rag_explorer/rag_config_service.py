@@ -18,6 +18,7 @@ DEFAULT_RAG_CONFIG = {
     'server_port': 8000,
     'cloud_tenant': '',        # Tenant ID for CloudClient
     'cloud_database': '',      # Database name for CloudClient
+    'collection': '',          # Selected collection name
 }
 
 
@@ -94,6 +95,7 @@ class RagConfigService:
             'server_port': int(config_data.get('server_port', 8000)),
             'cloud_tenant': config_data.get('cloud_tenant', ''),
             'cloud_database': config_data.get('cloud_database', ''),
+            'collection': config_data.get('collection', ''),
         }
 
         try:
