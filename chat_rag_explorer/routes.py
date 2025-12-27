@@ -80,6 +80,112 @@ def get_prompt(prompt_id):
         return jsonify({"error": str(e)}), 500
 
 
+@main_bp.route("/api/prompts", methods=["POST"])
+def create_prompt():
+    request_id = generate_request_id()
+    start_time = time.time()
+
+    data = request.json
+    prompt_id = data.get("id", "").strip()
+    title = data.get("title", "").strip()
+    description = data.get("description", "").strip()
+    content = data.get("content", "").strip()
+
+    logger.info(f"[{request_id}] POST /api/prompts - Creating prompt: {prompt_id}")
+
+    if not prompt_id:
+        return jsonify({"error": "Prompt ID is required"}), 400
+    if not title:
+        return jsonify({"error": "Title is required"}), 400
+
+    # Check if prompt ID is protected
+    if prompt_service.is_protected(prompt_id):
+        return jsonify({"error": "Cannot use this prompt ID"}), 403
+
+    # Check if prompt already exists
+    existing = prompt_service.get_prompt_by_id(prompt_id, request_id)
+    if existing:
+        return jsonify({"error": "A prompt with this ID already exists"}), 409
+
+    try:
+        prompt = prompt_service.save_prompt(prompt_id, title, description, content, request_id)
+        if prompt is None:
+            return jsonify({"error": "Failed to create prompt"}), 500
+        elapsed = time.time() - start_time
+        logger.info(f"[{request_id}] POST /api/prompts - Created ({elapsed:.3f}s)")
+        return jsonify({"data": prompt}), 201
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] POST /api/prompts - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@main_bp.route("/api/prompts/<prompt_id>", methods=["PUT"])
+def update_prompt(prompt_id):
+    request_id = generate_request_id()
+    start_time = time.time()
+
+    data = request.json
+    title = data.get("title", "").strip()
+    description = data.get("description", "").strip()
+    content = data.get("content", "").strip()
+
+    logger.info(f"[{request_id}] PUT /api/prompts/{prompt_id} - Updating prompt")
+
+    if not title:
+        return jsonify({"error": "Title is required"}), 400
+
+    # Check if prompt is protected
+    if prompt_service.is_protected(prompt_id):
+        return jsonify({"error": "Cannot edit protected prompt"}), 403
+
+    # Check if prompt exists
+    existing = prompt_service.get_prompt_by_id(prompt_id, request_id)
+    if not existing:
+        return jsonify({"error": "Prompt not found"}), 404
+
+    try:
+        prompt = prompt_service.save_prompt(prompt_id, title, description, content, request_id)
+        if prompt is None:
+            return jsonify({"error": "Failed to update prompt"}), 500
+        elapsed = time.time() - start_time
+        logger.info(f"[{request_id}] PUT /api/prompts/{prompt_id} - Updated ({elapsed:.3f}s)")
+        return jsonify({"data": prompt})
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] PUT /api/prompts/{prompt_id} - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@main_bp.route("/api/prompts/<prompt_id>", methods=["DELETE"])
+def delete_prompt(prompt_id):
+    request_id = generate_request_id()
+    start_time = time.time()
+
+    logger.info(f"[{request_id}] DELETE /api/prompts/{prompt_id} - Deleting prompt")
+
+    # Check if prompt is protected
+    if prompt_service.is_protected(prompt_id):
+        return jsonify({"error": "Cannot delete protected prompt"}), 403
+
+    # Check if prompt exists
+    existing = prompt_service.get_prompt_by_id(prompt_id, request_id)
+    if not existing:
+        return jsonify({"error": "Prompt not found"}), 404
+
+    try:
+        success = prompt_service.delete_prompt(prompt_id, request_id)
+        if not success:
+            return jsonify({"error": "Failed to delete prompt"}), 500
+        elapsed = time.time() - start_time
+        logger.info(f"[{request_id}] DELETE /api/prompts/{prompt_id} - Deleted ({elapsed:.3f}s)")
+        return jsonify({"success": True})
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] DELETE /api/prompts/{prompt_id} - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
 @main_bp.route("/api/chat", methods=["POST"])
 def chat():
     request_id = generate_request_id()

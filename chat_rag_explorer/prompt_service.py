@@ -5,6 +5,16 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Protected default prompt - cannot be edited or deleted
+DEFAULT_PROMPT_ID = 'default_system_prompt'
+DEFAULT_PROMPT = {
+    'id': DEFAULT_PROMPT_ID,
+    'title': 'Helpful Assistant',
+    'description': 'A general-purpose helpful AI assistant',
+    'content': 'You are a helpful assistant.',
+    'protected': True
+}
+
 
 class PromptService:
     """Service for loading and parsing system prompts from markdown files."""
@@ -74,20 +84,26 @@ class PromptService:
 
         Returns list of prompt objects with id, title, description, content.
         Uses file mtime-based caching to avoid re-reading unchanged files.
+        Always includes the protected default prompt.
         """
         log_prefix = f"[{request_id}] " if request_id else ""
         prompts_dir = self._get_prompts_dir()
 
+        # Start with the protected default prompt
+        prompts = [DEFAULT_PROMPT.copy()]
+
         if not prompts_dir.exists():
             logger.warning(f"{log_prefix}Prompts directory does not exist: {prompts_dir}")
-            return []
-
-        prompts = []
+            return prompts
 
         for file_path in prompts_dir.glob('*.md'):
             try:
                 mtime = file_path.stat().st_mtime
                 prompt_id = file_path.stem
+
+                # Skip if somehow a file has the default prompt ID
+                if prompt_id == DEFAULT_PROMPT_ID:
+                    continue
 
                 # Check cache validity
                 if (prompt_id in self._cache and
@@ -99,6 +115,7 @@ class PromptService:
                 # Load and cache
                 prompt = self._load_prompt_file(file_path, request_id)
                 if prompt:
+                    prompt['protected'] = False
                     self._cache[prompt_id] = prompt
                     self._cache_mtime[prompt_id] = mtime
                     prompts.append(prompt)
@@ -119,6 +136,11 @@ class PromptService:
         Returns prompt object or None if not found.
         """
         log_prefix = f"[{request_id}] " if request_id else ""
+
+        # Return protected default prompt if requested
+        if prompt_id == DEFAULT_PROMPT_ID:
+            return DEFAULT_PROMPT.copy()
+
         prompts_dir = self._get_prompts_dir()
         file_path = prompts_dir / f"{prompt_id}.md"
 
@@ -138,6 +160,7 @@ class PromptService:
             # Load and cache
             prompt = self._load_prompt_file(file_path, request_id)
             if prompt:
+                prompt['protected'] = False
                 self._cache[prompt_id] = prompt
                 self._cache_mtime[prompt_id] = mtime
 
@@ -146,6 +169,95 @@ class PromptService:
         except Exception as e:
             logger.error(f"{log_prefix}Error loading prompt {prompt_id}: {e}")
             return None
+
+    def _format_prompt_file(self, title, description, content):
+        """Format prompt data as markdown with YAML frontmatter."""
+        return f'''---
+title: "{title}"
+description: "{description}"
+---
+{content}
+'''
+
+    def is_protected(self, prompt_id):
+        """Check if a prompt ID is protected."""
+        return prompt_id == DEFAULT_PROMPT_ID
+
+    def save_prompt(self, prompt_id, title, description, content, request_id=None):
+        """
+        Save a prompt to file. Creates new or updates existing.
+
+        Returns the saved prompt object or None on error.
+        Rejects saving to protected prompt IDs.
+        """
+        log_prefix = f"[{request_id}] " if request_id else ""
+
+        if self.is_protected(prompt_id):
+            logger.warning(f"{log_prefix}Cannot save protected prompt: {prompt_id}")
+            return None
+
+        prompts_dir = self._get_prompts_dir()
+
+        # Ensure prompts directory exists
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+
+        file_path = prompts_dir / f"{prompt_id}.md"
+
+        try:
+            file_content = self._format_prompt_file(title, description, content)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(file_content)
+
+            # Invalidate cache for this prompt
+            if prompt_id in self._cache:
+                del self._cache[prompt_id]
+            if prompt_id in self._cache_mtime:
+                del self._cache_mtime[prompt_id]
+
+            logger.info(f"{log_prefix}Saved prompt: {prompt_id}")
+
+            # Return the saved prompt
+            return self._load_prompt_file(file_path, request_id)
+
+        except Exception as e:
+            logger.error(f"{log_prefix}Failed to save prompt {prompt_id}: {e}")
+            return None
+
+    def delete_prompt(self, prompt_id, request_id=None):
+        """
+        Delete a prompt file.
+
+        Returns True on success, False on error.
+        Rejects deleting protected prompts.
+        """
+        log_prefix = f"[{request_id}] " if request_id else ""
+
+        if self.is_protected(prompt_id):
+            logger.warning(f"{log_prefix}Cannot delete protected prompt: {prompt_id}")
+            return False
+
+        prompts_dir = self._get_prompts_dir()
+        file_path = prompts_dir / f"{prompt_id}.md"
+
+        if not file_path.exists():
+            logger.warning(f"{log_prefix}Cannot delete, prompt not found: {prompt_id}")
+            return False
+
+        try:
+            file_path.unlink()
+
+            # Remove from cache
+            if prompt_id in self._cache:
+                del self._cache[prompt_id]
+            if prompt_id in self._cache_mtime:
+                del self._cache_mtime[prompt_id]
+
+            logger.info(f"{log_prefix}Deleted prompt: {prompt_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"{log_prefix}Failed to delete prompt {prompt_id}: {e}")
+            return False
 
 
 # Singleton instance

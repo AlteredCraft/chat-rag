@@ -78,12 +78,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const FILTER_STORAGE_KEY = 'chat-rag-free-filter';
     const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
 
-    // Prompt selection elements and constants
+    // Prompt editor elements and constants
     const PROMPT_STORAGE_KEY = 'chat-rag-selected-prompt';
     const DEFAULT_PROMPT = 'default_system_prompt';
     const promptSelect = document.getElementById('prompt-select');
     const promptLoadingIndicator = document.getElementById('prompt-loading-indicator');
-    const promptDetails = document.getElementById('prompt-details');
+    const promptTitleInput = document.getElementById('prompt-title');
+    const promptDescInput = document.getElementById('prompt-description');
+    const promptContentInput = document.getElementById('prompt-content');
+    const newPromptBtn = document.getElementById('new-prompt-btn');
+    const deletePromptBtn = document.getElementById('delete-prompt-btn');
+    const savePromptBtn = document.getElementById('save-prompt-btn');
+    const deleteModal = document.getElementById('delete-modal');
+    const deleteModalCancel = document.getElementById('delete-modal-cancel');
+    const deleteModalOk = document.getElementById('delete-modal-ok');
+
+    let isCreatingNew = false;
+    let originalPromptData = null;
 
     function isFreeModel(model) {
         const pricing = model.pricing || {};
@@ -290,7 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
         restoreSelectedModel();
     });
 
-    // ===== Prompt Selection Functions =====
+    // ===== Prompt Editor Functions =====
 
     async function loadPrompts() {
         SettingsLogger.info('Loading prompts from API');
@@ -315,6 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             populatePromptSelect(promptsData);
             restoreSelectedPrompt();
+            updateDeleteButtonState();
 
         } catch (error) {
             const elapsed = performance.now() - startTime;
@@ -360,39 +372,205 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem(PROMPT_STORAGE_KEY, DEFAULT_PROMPT);
             SettingsLogger.info('Using default prompt (no saved selection)', { prompt: DEFAULT_PROMPT });
         }
-        updatePromptDetails();
+        loadPromptIntoForm();
     }
 
-    function updatePromptDetails() {
+    function loadPromptIntoForm() {
         const selectedPrompt = promptsData.find(p => p.id === promptSelect.value);
         if (!selectedPrompt) {
-            promptDetails.classList.remove('visible');
+            clearForm();
             return;
         }
 
-        promptDetails.innerHTML = `
-            ${selectedPrompt.description ? `<div class="detail-row description"><span class="detail-value">${selectedPrompt.description}</span></div>` : ''}
-            <div class="detail-row">
-                <span class="detail-label">Prompt ID:</span>
-                <span class="detail-value">${selectedPrompt.id}</span>
-            </div>
-        `;
-        promptDetails.classList.add('visible');
+        isCreatingNew = false;
+        originalPromptData = { ...selectedPrompt };
+        promptTitleInput.value = selectedPrompt.title || '';
+        promptDescInput.value = selectedPrompt.description || '';
+        promptContentInput.value = selectedPrompt.content || '';
+
+        // Disable form fields for protected prompts
+        const isProtected = selectedPrompt.protected === true;
+        promptTitleInput.disabled = isProtected;
+        promptDescInput.disabled = isProtected;
+        promptContentInput.disabled = isProtected;
+
+        updateSaveButtonState();
+        updateDeleteButtonState();
     }
 
+    function clearForm() {
+        promptTitleInput.value = '';
+        promptDescInput.value = '';
+        promptContentInput.value = '';
+        promptTitleInput.disabled = false;
+        promptDescInput.disabled = false;
+        promptContentInput.disabled = false;
+        originalPromptData = null;
+        updateSaveButtonState();
+    }
+
+    function updateDeleteButtonState() {
+        // Disable delete if creating new or prompt is protected
+        const selectedPrompt = promptsData.find(p => p.id === promptSelect.value);
+        const isProtected = selectedPrompt?.protected === true;
+        deletePromptBtn.disabled = isCreatingNew || isProtected;
+    }
+
+    function updateSaveButtonState() {
+        if (isCreatingNew) {
+            // For new prompts, enable save if title is filled
+            savePromptBtn.disabled = !promptTitleInput.value.trim();
+        } else if (originalPromptData) {
+            // Protected prompts cannot be saved
+            if (originalPromptData.protected) {
+                savePromptBtn.disabled = true;
+                return;
+            }
+            // For existing prompts, enable save if anything changed
+            const hasChanges =
+                promptTitleInput.value !== originalPromptData.title ||
+                promptDescInput.value !== (originalPromptData.description || '') ||
+                promptContentInput.value !== (originalPromptData.content || '');
+            savePromptBtn.disabled = !hasChanges || !promptTitleInput.value.trim();
+        } else {
+            savePromptBtn.disabled = true;
+        }
+    }
+
+    function generatePromptId(title) {
+        return title.toLowerCase()
+            .replace(/[^a-z0-9\s]/g, '')
+            .replace(/\s+/g, '_')
+            .substring(0, 50);
+    }
+
+    async function savePrompt() {
+        const title = promptTitleInput.value.trim();
+        const description = promptDescInput.value.trim();
+        const content = promptContentInput.value.trim();
+
+        if (!title) {
+            SettingsLogger.warn('Save failed: title is required');
+            return;
+        }
+
+        savePromptBtn.disabled = true;
+        savePromptBtn.textContent = 'Saving...';
+
+        try {
+            let response;
+            let promptId;
+
+            if (isCreatingNew) {
+                promptId = generatePromptId(title);
+                SettingsLogger.info('Creating new prompt', { id: promptId });
+                response = await fetch('/api/prompts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: promptId, title, description, content })
+                });
+            } else {
+                promptId = promptSelect.value;
+                SettingsLogger.info('Updating prompt', { id: promptId });
+                response = await fetch(`/api/prompts/${promptId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description, content })
+                });
+            }
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to save prompt');
+            }
+
+            SettingsLogger.info('Prompt saved successfully', { id: promptId });
+
+            // Reload prompts and select the saved one
+            await loadPrompts();
+            promptSelect.value = promptId;
+            localStorage.setItem(PROMPT_STORAGE_KEY, promptId);
+            loadPromptIntoForm();
+
+        } catch (error) {
+            SettingsLogger.error('Failed to save prompt', { error: error.message });
+            alert('Failed to save: ' + error.message);
+        } finally {
+            savePromptBtn.textContent = 'Save Changes';
+            updateSaveButtonState();
+        }
+    }
+
+    function startNewPrompt() {
+        isCreatingNew = true;
+        promptSelect.value = '';
+        clearForm();
+        promptTitleInput.focus();
+        updateDeleteButtonState();
+        SettingsLogger.info('Starting new prompt creation');
+    }
+
+    function showDeleteModal() {
+        deleteModal.classList.add('visible');
+    }
+
+    function hideDeleteModal() {
+        deleteModal.classList.remove('visible');
+    }
+
+    async function deletePrompt() {
+        const promptId = promptSelect.value;
+        if (!promptId || promptsData.length <= 1) return;
+
+        hideDeleteModal();
+        SettingsLogger.info('Deleting prompt', { id: promptId });
+
+        try {
+            const response = await fetch(`/api/prompts/${promptId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to delete prompt');
+            }
+
+            SettingsLogger.info('Prompt deleted successfully', { id: promptId });
+
+            // Clear from localStorage if it was selected
+            if (localStorage.getItem(PROMPT_STORAGE_KEY) === promptId) {
+                localStorage.removeItem(PROMPT_STORAGE_KEY);
+            }
+
+            // Reload prompts
+            await loadPrompts();
+
+        } catch (error) {
+            SettingsLogger.error('Failed to delete prompt', { error: error.message });
+            alert('Failed to delete: ' + error.message);
+        }
+    }
+
+    // Prompt event listeners
     promptSelect.addEventListener('change', () => {
         const selectedPrompt = promptSelect.value;
-        const previousPrompt = localStorage.getItem(PROMPT_STORAGE_KEY);
-
         if (selectedPrompt) {
+            isCreatingNew = false;
             localStorage.setItem(PROMPT_STORAGE_KEY, selectedPrompt);
-            SettingsLogger.info('Prompt selection changed', {
-                previousPrompt: previousPrompt || '(none)',
-                newPrompt: selectedPrompt
-            });
-            updatePromptDetails();
+            SettingsLogger.info('Prompt selection changed', { prompt: selectedPrompt });
+            loadPromptIntoForm();
         }
     });
+
+    promptTitleInput.addEventListener('input', updateSaveButtonState);
+    promptDescInput.addEventListener('input', updateSaveButtonState);
+    promptContentInput.addEventListener('input', updateSaveButtonState);
+
+    newPromptBtn.addEventListener('click', startNewPrompt);
+    savePromptBtn.addEventListener('click', savePrompt);
+    deletePromptBtn.addEventListener('click', showDeleteModal);
+    deleteModalCancel.addEventListener('click', hideDeleteModal);
+    deleteModalOk.addEventListener('click', deletePrompt);
 
     SettingsLogger.info('Settings page initialized successfully');
 });

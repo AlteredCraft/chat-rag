@@ -48,19 +48,38 @@
                         </section>
 
                         <section class="tab-panel" data-panel="prompt">
-                            <p class="section-description">Choose the system prompt that defines the AI's behavior and personality.</p>
+                            <p class="section-description">Manage system prompts that define the AI's behavior and personality.</p>
 
                             <div class="setting-item">
-                                <label for="prompt-select">Active Prompt</label>
-                                <div class="select-wrapper">
-                                    <select id="prompt-select" disabled>
-                                        <option value="">Loading prompts...</option>
-                                    </select>
-                                    <span id="prompt-loading-indicator" class="loading-indicator"></span>
+                                <div class="prompt-toolbar">
+                                    <div class="select-wrapper">
+                                        <select id="prompt-select" disabled>
+                                            <option value="">Loading prompts...</option>
+                                        </select>
+                                        <span id="prompt-loading-indicator" class="loading-indicator"></span>
+                                    </div>
+                                    <button type="button" id="new-prompt-btn" class="toolbar-btn">New</button>
+                                    <button type="button" id="delete-prompt-btn" class="toolbar-btn danger" disabled>Delete</button>
                                 </div>
-                                <div id="prompt-details" class="model-details">
-                                    <!-- Prompt details will appear here -->
-                                </div>
+                            </div>
+
+                            <div class="setting-item">
+                                <label for="prompt-title">Title</label>
+                                <input type="text" id="prompt-title" class="text-input" placeholder="Enter prompt title">
+                            </div>
+
+                            <div class="setting-item">
+                                <label for="prompt-description">Description</label>
+                                <input type="text" id="prompt-description" class="text-input" placeholder="Brief description (optional)">
+                            </div>
+
+                            <div class="setting-item">
+                                <label for="prompt-content">Content</label>
+                                <textarea id="prompt-content" class="prompt-textarea" placeholder="Enter the system prompt content..."></textarea>
+                            </div>
+
+                            <div class="setting-item">
+                                <button type="button" id="save-prompt-btn" class="save-btn" disabled>Save Changes</button>
                             </div>
                         </section>
 
@@ -73,6 +92,16 @@
                             </div>
                         </section>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="delete-modal" class="modal-overlay">
+            <div class="modal">
+                <p class="modal-message">Delete this prompt? This cannot be undone.</p>
+                <div class="modal-buttons">
+                    <button id="delete-modal-cancel" class="modal-btn modal-btn-cancel">Cancel</button>
+                    <button id="delete-modal-ok" class="modal-btn modal-btn-ok">Delete</button>
                 </div>
             </div>
         </div>
