@@ -100,23 +100,48 @@ document.addEventListener('DOMContentLoaded', () => {
     // Session persistence keys (survives navigation, clears on tab close)
     const SESSION_HISTORY_KEY = 'chat-rag-conversation-history';
     const SESSION_METRICS_KEY = 'chat-rag-session-metrics';
+    const SESSION_METADATA_KEY = 'chat-rag-message-metadata';
+
+    // Per-message metadata for details modal
+    let messageMetadata = {};
+    let messageIndex = 0; // Counter for message indices
 
     // Save conversation to sessionStorage
     function saveConversationToSession() {
         sessionStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(conversationHistory));
         sessionStorage.setItem(SESSION_METRICS_KEY, JSON.stringify(sessionMetrics));
+        sessionStorage.setItem(SESSION_METADATA_KEY, JSON.stringify(messageMetadata));
     }
 
     // Clear conversation from sessionStorage
     function clearConversationSession() {
         sessionStorage.removeItem(SESSION_HISTORY_KEY);
         sessionStorage.removeItem(SESSION_METRICS_KEY);
+        sessionStorage.removeItem(SESSION_METADATA_KEY);
+        messageMetadata = {};
+        messageIndex = 0;
+    }
+
+    // Save metadata for a specific message
+    function saveMessageMetadata(index, data) {
+        messageMetadata[index] = data;
+        sessionStorage.setItem(SESSION_METADATA_KEY, JSON.stringify(messageMetadata));
     }
 
     // Restore conversation from sessionStorage and re-render to DOM
     function restoreConversationFromSession() {
         const savedHistory = sessionStorage.getItem(SESSION_HISTORY_KEY);
         const savedMetrics = sessionStorage.getItem(SESSION_METRICS_KEY);
+        const savedMetadata = sessionStorage.getItem(SESSION_METADATA_KEY);
+
+        // Restore metadata first
+        if (savedMetadata) {
+            try {
+                messageMetadata = JSON.parse(savedMetadata);
+            } catch (e) {
+                AppLogger.error('Failed to restore metadata', { error: e.message });
+            }
+        }
 
         if (savedHistory) {
             try {
@@ -124,16 +149,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 AppLogger.info('Restored conversation from session', { messages: conversationHistory.length });
 
                 // Re-render messages to DOM (skip system message)
-                conversationHistory.forEach(msg => {
+                // Use a display counter that matches our messageIndex pattern
+                let displayIndex = 0;
+                conversationHistory.forEach((msg) => {
                     if (msg.role === 'user') {
-                        appendMessage('user', msg.content);
+                        appendMessage('user', msg.content, displayIndex);
+                        displayIndex++;
                     } else if (msg.role === 'assistant') {
-                        const contentDiv = appendMessage('bot', '');
+                        const contentDiv = appendMessage('bot', '', displayIndex);
                         const html = marked.parse(msg.content);
                         contentDiv.innerHTML = DOMPurify.sanitize(html);
+                        displayIndex++;
                     }
-                    // Skip system messages in UI
+                    // Skip system messages in UI (don't increment displayIndex)
                 });
+
+                // Update message index counter to continue from where we left off
+                messageIndex = displayIndex;
 
                 return true; // Restored
             } catch (e) {
@@ -324,18 +356,34 @@ document.addEventListener('DOMContentLoaded', () => {
         messageInput.disabled = true;
         submitButton.disabled = true;
 
+        // Capture prompt context BEFORE adding user message (for metadata)
+        // We'll add the user message to this copy to get the full context sent to LLM
+        const promptContext = JSON.parse(JSON.stringify(conversationHistory));
+
         // Add user message to history
         conversationHistory.push({ role: 'user', content: message });
+        promptContext.push({ role: 'user', content: message }); // Add to context copy too
         saveConversationToSession();
 
+        // Track message indices
+        const userMsgIndex = messageIndex++;
+        const assistantMsgIndex = messageIndex++;
+
+        // Save user message metadata (minimal - just timestamp and type)
+        saveMessageMetadata(userMsgIndex, {
+            type: 'user',
+            timestamp: new Date().toISOString()
+        });
+
         // Add user message UI
-        appendMessage('user', message);
+        appendMessage('user', message, userMsgIndex);
 
         // Add empty bot message container
-        const botMessageContent = appendMessage('bot', '');
+        const botMessageContent = appendMessage('bot', '', assistantMsgIndex);
         let messageBuffer = '';
         let chunkCount = 0;
         let firstChunkTime = null;
+        let receivedTokens = null; // Store tokens when metadata arrives
 
         try {
             // Build request body with optional parameters
@@ -399,6 +447,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         const usageData = JSON.parse(metadataJson);
                         AppLogger.info('Token usage received', usageData);
                         updateMetrics(usageData);
+                        // Store tokens for assistant metadata
+                        receivedTokens = {
+                            prompt: usageData.prompt_tokens,
+                            completion: usageData.completion_tokens,
+                            total: usageData.total_tokens
+                        };
                     } catch (parseError) {
                         AppLogger.error('Failed to parse metadata', { error: parseError.message, chunk: chunk });
                     }
@@ -426,6 +480,25 @@ document.addEventListener('DOMContentLoaded', () => {
             if (messageBuffer) {
                 conversationHistory.push({ role: 'assistant', content: messageBuffer });
                 saveConversationToSession();
+
+                // Save assistant message metadata with full context
+                saveMessageMetadata(assistantMsgIndex, {
+                    type: 'assistant',
+                    timestamp: new Date().toISOString(),
+                    model: model,
+                    params: {
+                        temperature: requestBody.temperature,
+                        top_p: requestBody.top_p
+                    },
+                    promptContext: promptContext,
+                    tokens: receivedTokens,
+                    timing: {
+                        total_ms: totalTime,
+                        ttfc_ms: firstChunkTime ? (firstChunkTime - requestStartTime) : null
+                    },
+                    chunks: chunkCount,
+                    response: messageBuffer
+                });
             }
 
         } catch (error) {
@@ -466,13 +539,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function appendMessage(role, text) {
+    function appendMessage(role, text, msgIndex = null) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${role}`;
-        
+
+        // Store message index for details lookup
+        if (msgIndex !== null) {
+            messageDiv.dataset.msgIndex = msgIndex;
+        }
+
         const contentDiv = document.createElement('div');
         contentDiv.className = 'content';
-        
+
         if (role === 'user') {
             contentDiv.textContent = text;
         } else {
@@ -480,15 +558,178 @@ document.addEventListener('DOMContentLoaded', () => {
             const html = marked.parse(text || '');
             contentDiv.innerHTML = DOMPurify.sanitize(html);
         }
-        
+
         messageDiv.appendChild(contentDiv);
+
+        // Add details link for assistant messages (they have the full context)
+        if (role === 'bot' && msgIndex !== null) {
+            const detailsLink = document.createElement('span');
+            detailsLink.className = 'message-details-link';
+            detailsLink.textContent = 'view details';
+            detailsLink.dataset.msgIndex = msgIndex;
+            detailsLink.addEventListener('click', () => showDetailsModal(msgIndex));
+            messageDiv.appendChild(detailsLink);
+        }
+
         chatHistory.appendChild(messageDiv);
-        
+
         // Scroll to bottom
         chatHistory.scrollTop = chatHistory.scrollHeight;
 
         return contentDiv; // Return content div so we can append to it
     }
+
+    // ==================== Details Modal ====================
+
+    const detailsModal = document.getElementById('details-modal');
+    const detailsContent = document.getElementById('details-content');
+    const detailsModalClose = document.getElementById('details-modal-close');
+
+    if (detailsModalClose) {
+        detailsModalClose.addEventListener('click', () => {
+            detailsModal.classList.remove('visible');
+        });
+    }
+
+    if (detailsModal) {
+        detailsModal.addEventListener('click', (e) => {
+            if (e.target === detailsModal) {
+                detailsModal.classList.remove('visible');
+            }
+        });
+    }
+
+    function showDetailsModal(msgIndex) {
+        const metadata = messageMetadata[msgIndex];
+        if (!metadata) {
+            AppLogger.warn('No metadata found for message', { msgIndex });
+            return;
+        }
+
+        AppLogger.info('Showing details modal', { msgIndex, metadata });
+
+        // Build the modal content
+        let html = '';
+
+        // Meta info section
+        html += '<div class="details-meta">';
+        html += `<div class="details-meta-item"><span class="details-meta-label">Model:</span><span class="details-meta-value">${escapeHtml(metadata.model || 'Unknown')}</span></div>`;
+
+        if (metadata.params) {
+            if (metadata.params.temperature !== undefined) {
+                html += `<div class="details-meta-item"><span class="details-meta-label">Temperature:</span><span class="details-meta-value">${metadata.params.temperature}</span></div>`;
+            }
+            if (metadata.params.top_p !== undefined) {
+                html += `<div class="details-meta-item"><span class="details-meta-label">Top P:</span><span class="details-meta-value">${metadata.params.top_p}</span></div>`;
+            }
+        }
+
+        if (metadata.tokens) {
+            html += `<div class="details-meta-item"><span class="details-meta-label">Tokens:</span><span class="details-meta-value">${metadata.tokens.prompt || 0} → ${metadata.tokens.completion || 0} (${metadata.tokens.total || 0})</span></div>`;
+        }
+
+        if (metadata.timing) {
+            const totalSec = (metadata.timing.total_ms / 1000).toFixed(2);
+            const ttfcSec = metadata.timing.ttfc_ms ? (metadata.timing.ttfc_ms / 1000).toFixed(2) : '-';
+            html += `<div class="details-meta-item"><span class="details-meta-label">Time:</span><span class="details-meta-value">${totalSec}s (TTFC: ${ttfcSec}s)</span></div>`;
+        }
+        html += '</div>';
+
+        // Prompt section
+        if (metadata.promptContext && metadata.promptContext.length > 0) {
+            const msgCount = metadata.promptContext.length;
+            html += '<div class="details-section">';
+            html += `<div class="details-section-header">Prompt sent to LLM <span class="msg-count">(${msgCount} messages)</span></div>`;
+
+            // Find system message, previous context, and current user message
+            const systemMsg = metadata.promptContext.find(m => m.role === 'system');
+            const previousContext = metadata.promptContext.filter((m, i) =>
+                m.role !== 'system' && i < metadata.promptContext.length - 1
+            );
+            const currentUserMsg = metadata.promptContext.length > 1 ?
+                metadata.promptContext[metadata.promptContext.length - 1] : null;
+
+            // System message (always expanded)
+            if (systemMsg) {
+                html += '<div class="details-message system">';
+                html += '<div class="details-message-header">System</div>';
+                html += `<div class="details-message-content">${escapeHtml(systemMsg.content)}</div>`;
+                html += '</div>';
+            }
+
+            // Previous context (collapsed if exists)
+            if (previousContext.length > 0) {
+                const exchangeCount = Math.floor(previousContext.length / 2);
+                const previews = previousContext.slice(0, 4).map(m =>
+                    `${m.role}: "${truncate(m.content, 40)}"`
+                ).join(' · ');
+
+                html += `<div class="details-context-toggle" onclick="togglePreviousContext(this)">`;
+                html += `<span class="toggle-icon">▶</span>`;
+                html += `<div class="details-context-summary">`;
+                html += `<strong>Previous context (${exchangeCount} exchange${exchangeCount > 1 ? 's' : ''})</strong>`;
+                html += `<span class="exchange-preview">${escapeHtml(previews)}</span>`;
+                html += `</div>`;
+                html += `</div>`;
+
+                html += '<div class="details-context-content">';
+                previousContext.forEach(msg => {
+                    const roleClass = msg.role === 'user' ? 'user' : 'assistant';
+                    html += `<div class="details-message ${roleClass}">`;
+                    html += `<div class="details-message-header">${msg.role}</div>`;
+                    html += `<div class="details-message-content">${escapeHtml(msg.content)}</div>`;
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            // Current user message (always expanded)
+            if (currentUserMsg && currentUserMsg.role === 'user') {
+                html += '<div class="details-message user">';
+                html += '<div class="details-message-header">User (current)</div>';
+                html += `<div class="details-message-content">${escapeHtml(currentUserMsg.content)}</div>`;
+                html += '</div>';
+            }
+
+            html += '</div>';
+        }
+
+        // Response section
+        if (metadata.response) {
+            html += '<div class="details-section">';
+            html += '<div class="details-section-header">Response from LLM</div>';
+            html += '<div class="details-message assistant">';
+            html += '<div class="details-message-header">Assistant</div>';
+            html += `<div class="details-message-content">${escapeHtml(metadata.response)}</div>`;
+            html += '</div>';
+            html += '</div>';
+        }
+
+        detailsContent.innerHTML = html;
+        detailsModal.classList.add('visible');
+    }
+
+    // Helper to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Helper to truncate text
+    function truncate(text, maxLength) {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    }
+
+    // Global function to toggle previous context (called from onclick)
+    window.togglePreviousContext = function(element) {
+        element.classList.toggle('expanded');
+        const content = element.nextElementSibling;
+        if (content) {
+            content.classList.toggle('expanded');
+        }
+    };
 
     AppLogger.info('Chat application initialized successfully', {
         sessionId: AppLogger.sessionId,

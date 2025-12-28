@@ -958,3 +958,233 @@ button:disabled {
     margin-bottom: 0.75rem;
     color: #444;
 }
+
+/* Details Modal */
+.details-modal {
+    max-width: 700px;
+    width: 95%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+}
+
+.details-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.details-modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #333;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-close-btn:hover {
+    color: #333;
+}
+
+.details-modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Details content */
+.details-meta {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem 1.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+.details-meta-item {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.details-meta-label {
+    color: #666;
+}
+
+.details-meta-value {
+    font-weight: 600;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    color: #333;
+}
+
+.details-section {
+    margin-bottom: 1.5rem;
+}
+
+.details-section:last-child {
+    margin-bottom: 0;
+}
+
+.details-section-header {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05rem;
+    color: #666;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.details-section-header .msg-count {
+    font-weight: 600;
+    color: #333;
+}
+
+/* Message blocks in details */
+.details-message {
+    margin-bottom: 0.75rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.details-message:last-child {
+    margin-bottom: 0;
+}
+
+.details-message-header {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03rem;
+}
+
+.details-message-content {
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.details-message.system .details-message-header {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.details-message.system .details-message-content {
+    background-color: #f5f9ff;
+}
+
+.details-message.user .details-message-header {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.details-message.user .details-message-content {
+    background-color: #f5fff6;
+}
+
+.details-message.assistant .details-message-header {
+    background-color: #fff3e0;
+    color: #e65100;
+}
+
+.details-message.assistant .details-message-content {
+    background-color: #fffaf5;
+}
+
+/* Collapsible previous context */
+.details-context-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background-color: #f8f9fa;
+    border: 1px solid #eee;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    color: #555;
+    transition: all 0.2s;
+}
+
+.details-context-toggle:hover {
+    background-color: #f0f0f0;
+    border-color: #ddd;
+}
+
+.details-context-toggle .toggle-icon {
+    font-size: 0.7rem;
+    transition: transform 0.2s;
+}
+
+.details-context-toggle.expanded .toggle-icon {
+    transform: rotate(90deg);
+}
+
+.details-context-summary {
+    flex: 1;
+}
+
+.details-context-summary .exchange-preview {
+    display: block;
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.details-context-content {
+    display: none;
+    padding-left: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.details-context-content.expanded {
+    display: block;
+}
+
+/* Message details link */
+.message-details-link {
+    display: inline-block;
+    font-size: 0.75rem;
+    color: #888;
+    text-decoration: none;
+    margin-top: 0.5rem;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.message-details-link:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+.message.user .message-details-link {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.message.user .message-details-link:hover {
+    color: #fff;
+}
