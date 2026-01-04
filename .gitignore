@@ -219,3 +219,4 @@ rag_config.json
 logs/*
 !logs/.gitkeep
 
+.vscode/

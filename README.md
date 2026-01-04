@@ -4,62 +4,60 @@ An educational application designed to demonstrate the implementation of a Chat 
 
 This project uses **Flask** for the backend, **OpenRouter** for LLM access (supporting models like GPT-4, Claude 3, Llama 3, etc.), and **vanilla JavaScript** for a clean, streaming chat interface.
 
-## 🚀 Features
-
-*   **Real-time Streaming**: Implements Server-Sent Events (SSE) logic to stream LLM responses token-by-token.
-*   **Model Selection**: Settings page with a dynamic model picker that fetches all available models from OpenRouter, grouped by provider with pricing and context length details.
-*   **Conversation History**: Full multi-turn conversation support, allowing the LLM to remember context throughout the session.
-*   **Metrics Sidebar**: A dedicated right-hand sidebar displaying real-time session metrics, including model identification and token usage (prompt, completion, total).
-*   **Markdown Support**: Securely renders Markdown (including lists, code blocks, and formatting) using Marked.js and DOMPurify for sanitization. Works offline.
-*   **Modular Architecture**: Organized following Flask best practices (Blueprints, Application Factory pattern).
-*   **Centralized Logging**: Request ID correlation, performance metrics, and configurable log levels for app and dependencies. See [Logging](#-logging) section for details.
-*   **OpenRouter Integration**: Easy access to various state-of-the-art models via a single API.
-*   **Clean UI**: A responsive, modern chat interface built with raw HTML/CSS/JS (no heavy frontend frameworks).
-*   **Modern Python Tooling**: Uses `uv` for blazing fast dependency management.
-
-## 🛠 Prerequisites
+## Prerequisites
 
 *   Python 3.13+
 *   [uv](https://github.com/astral-sh/uv) (for package management)
 *   An [OpenRouter](https://openrouter.ai/) API Key
 
-## ⚡️ Quick Start
+## Quick Start
 
 1.  **Clone the repository**
     ```bash
     git clone https://github.com/yourusername/chat-rag-explorer.git
     cd chat-rag-explorer
+    uv sync
+    uv run pytest
     ```
 
 2.  **Set up the environment variables**
-    Create a `.env` file in the root directory:
     ```bash
     cp .env.example .env
     ```
-    Add your API key and optional configuration to `.env`:
+    Edit `.env` and add your API key:
     ```env
     OPENROUTER_API_KEY=sk-or-v1-your-key-here
-    
-    # Logging Configuration
-    LOG_LEVEL_APP=DEBUG
-    LOG_LEVEL_DEPS=INFO
-    LOG_TO_STDOUT=true
-    LOG_TO_FILE=true
-    LOG_FILE_PATH=app.log
     ```
+    See [Logging Configuration](#logging-configuration) for optional logging settings.
 
 3.  **Run the application**
-    Use `uv` to sync dependencies and run the server:
     ```bash
     uv run main.py
     ```
 
-    > **Port in use?** If port 5005 is taken, edit the `port` variable in `main.py`.
+    > **Port in use?** The app auto-finds an available port (8000-8004).
 
 4.  **Explore**
-    Open your browser to [http://127.0.0.1:5005](http://127.0.0.1:5005).
+    Open your browser to [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
-## 📂 Project Structure
+## Features
+
+*   **Real-time Streaming**: Server-Sent Events (SSE) to stream LLM responses token-by-token
+*   **Model Selection**: Dynamic model picker with all available OpenRouter models, grouped by provider
+*   **Conversation History**: Multi-turn conversation support with context retention
+*   **Metrics Sidebar**: Real-time session metrics including token usage
+*   **Markdown Support**: Secure rendering using Marked.js and DOMPurify (works offline)
+*   **Clean UI**: Responsive interface built with vanilla HTML/CSS/JS
+
+---
+
+# Learn More
+
+The sections below provide deeper insight into the application's architecture, testing, logging system, and development roadmap.
+
+## Architecture
+
+### Project Structure
 
 ```text
 chat-rag-explorer/
@@ -85,15 +83,21 @@ chat-rag-explorer/
 └── .env                     # Secrets and local overrides (gitignored)
 ```
 
-## 🏗 Architectural Decisions
+### Design Patterns
 
-This project maintains Architecture Decision Records (ADRs) to document significant design choices and their rationale. You can find them in the `docs/adr/` directory. These are excellent resources for understanding *why* certain technologies or patterns were chosen.
+*   **Modular Architecture**: Flask Blueprints and Application Factory pattern
+*   **Centralized Logging**: Request ID correlation and configurable log levels
+*   **Modern Python Tooling**: Uses `uv` for fast dependency management
 
-## 📋 Logging
+### Architectural Decisions
+
+This project maintains Architecture Decision Records (ADRs) in the `docs/adr/` directory. These documents explain *why* certain technologies and patterns were chosen - excellent resources for understanding the design rationale.
+
+## Logging
 
 The application features a comprehensive logging system for debugging and monitoring.
 
-### Configuration
+### Logging Configuration
 
 Set these environment variables in your `.env` file:
 
@@ -103,7 +107,9 @@ Set these environment variables in your `.env` file:
 | `LOG_LEVEL_DEPS` | `INFO` | Log level for dependencies (Flask, httpx, etc.) |
 | `LOG_TO_STDOUT` | `true` | Output logs to console |
 | `LOG_TO_FILE` | `true` | Write logs to file |
-| `LOG_FILE_PATH` | `app.log` | Path to log file |
+| `LOG_FILE_PATH` | `logs/app.log` | Path to log file |
+| `CHAT_HISTORY_ENABLED` | `true` | Enable chat interaction logging |
+| `CHAT_HISTORY_PATH` | `logs/chat-history.jsonl` | Path to chat history file |
 
 ### Backend Logging
 
@@ -138,19 +144,40 @@ The browser console includes structured logs with session tracking:
 [2025-12-26T15:30:02.000Z] [sess_abc123] INFO: Chat response completed {chunks: 42, totalTime_ms: "1523.00"}
 ```
 
-Open browser DevTools (F12) → Console to view frontend logs.
+Open browser DevTools (F12) -> Console to view frontend logs.
 
-## 📚 Roadmap
+## Testing
+
+The project uses pytest with randomized test ordering to catch hidden state dependencies.
+
+### Running Tests
+
+```bash
+uv run pytest                     # Run all tests (randomized order)
+uv run pytest -v                  # Verbose output
+uv run pytest -x                  # Stop on first failure
+uv run pytest --cov               # Run with coverage report
+uv run pytest -k "test_name"      # Run specific test by name
+```
+
+### Test Philosophy
+
+*   **Unit tests** live in `tests/unit/` and must not make network calls
+*   External dependencies (ChromaDB, OpenRouter) are mocked
+*   Use `tmp_path` fixture for any file operations
+*   Tests run in random order to catch hidden state dependencies
+
+## Roadmap
 
 *   [x] Basic Chat Interface
 *   [x] LLM Streaming
 *   [x] Conversation History (Multi-turn)
 *   [x] Metrics Sidebar (Token usage & Model info)
 *   [x] Settings Page with Model Selection
-*   [ ] **RAG Implementation**: Connect a vector database to query local documents.
+*   [ ] **RAG Implementation**: Connect a vector database to query local documents
 *   [ ] Further settings and metrics for Chat UI
 *   [ ] Chat History Persistence (Server-side)
 
-## 📝 License
+## License
 
 This project is open source and available under the [MIT License](LICENSE).
