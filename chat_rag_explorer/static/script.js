@@ -138,8 +138,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savedMetadata) {
             try {
                 messageMetadata = JSON.parse(savedMetadata);
+
+                // Restore "Last Interaction" display from the most recent message's metadata
+                const indices = Object.keys(messageMetadata).map(Number);
+                if (indices.length > 0) {
+                    const lastIndex = Math.max(...indices);
+                    const lastMetadata = messageMetadata[lastIndex];
+                    if (lastMetadata && lastMetadata.tokens) {
+                        document.getElementById('metric-prompt-tokens').textContent = lastMetadata.tokens.prompt_tokens || 0;
+                        document.getElementById('metric-completion-tokens').textContent = lastMetadata.tokens.completion_tokens || 0;
+                        document.getElementById('metric-total-tokens').textContent = lastMetadata.tokens.total_tokens || 0;
+                    }
+                }
             } catch (e) {
                 AppLogger.error('Failed to restore metadata', { error: e.message });
+            }
+        }
+
+        // Restore metrics (do this before history since history restoration may return early)
+        if (savedMetrics) {
+            try {
+                sessionMetrics = JSON.parse(savedMetrics);
+                // Update metrics display
+                document.getElementById('total-prompt-tokens').textContent = sessionMetrics.prompt_tokens;
+                document.getElementById('total-completion-tokens').textContent = sessionMetrics.completion_tokens;
+                document.getElementById('total-total-tokens').textContent = sessionMetrics.total_tokens;
+            } catch (e) {
+                AppLogger.error('Failed to restore metrics', { error: e.message });
             }
         }
 
@@ -170,18 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return true; // Restored
             } catch (e) {
                 AppLogger.error('Failed to restore conversation', { error: e.message });
-            }
-        }
-
-        if (savedMetrics) {
-            try {
-                sessionMetrics = JSON.parse(savedMetrics);
-                // Update metrics display
-                document.getElementById('total-prompt-tokens').textContent = sessionMetrics.prompt_tokens;
-                document.getElementById('total-completion-tokens').textContent = sessionMetrics.completion_tokens;
-                document.getElementById('total-total-tokens').textContent = sessionMetrics.total_tokens;
-            } catch (e) {
-                AppLogger.error('Failed to restore metrics', { error: e.message });
             }
         }
 
